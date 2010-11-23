@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+	targetNamespace="http://www.infinitysoft.de/contao/website_builder"
+	xmlns:wb="http://www.infinitysoft.de/contao/website_builder"
+	elementFormDefault="qualified">
+
+	<xsd:element name="datasets">
+		<xsd:annotation>
+			<xsd:documentation>
+				A list of predefined datasets, that can be
+				imported into an existing website.
+			</xsd:documentation>
+		</xsd:annotation>
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element ref="wb:dataset" minOccurs="0" maxOccurs="unbounded" />
+				<xsd:element name="import" type="xsd:string" minOccurs="0" maxOccurs="unbounded" />
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+
+	<xsd:element name="dataset">
+		<xsd:annotation>
+			<xsd:documentation>
+				A single dataset, that can be imported.
+						</xsd:documentation>
+		</xsd:annotation>
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="name" type="xsd:string" />
+				<xsd:element name="description" type="xsd:string"
+					minOccurs="0" />
+				<xsd:choice minOccurs="0">
+					<xsd:element name="variable" type="wb:variable"
+						minOccurs="0" maxOccurs="unbounded" />
+					<xsd:element name="group">
+						<xsd:complexType>
+							<xsd:choice>
+								<xsd:element name="variable" type="wb:variable"
+									minOccurs="0" maxOccurs="unbounded" />
+							</xsd:choice>
+							<xsd:attribute name="title" type="xsd:string" />
+						</xsd:complexType>
+					</xsd:element>
+				</xsd:choice>
+				
+				<xsd:element name="row" type="wb:datarow" maxOccurs="unbounded" />
+				
+				<xsd:choice minOccurs="0" maxOccurs="unbounded">
+					<xsd:element name="mkdir" type="xsd:string" />
+					<xsd:element name="mkfile" type="xsd:string" />
+					<xsd:element name="load">
+						<xsd:complexType>
+							<xsd:simpleContent>
+								<xsd:extension base="xsd:string">
+									<xsd:attribute name="target" type="xsd:string" />
+									<xsd:attribute name="unzip" default="false" type="xsd:boolean" />
+								</xsd:extension>
+							</xsd:simpleContent>
+						</xsd:complexType>
+					</xsd:element>
+				</xsd:choice>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+
+	<xsd:complexType name="datarow">
+		<xsd:sequence>
+			<xsd:element name="field" maxOccurs="unbounded">
+				<xsd:complexType>
+					<xsd:simpleContent>
+						<xsd:extension base="xsd:string">
+							<xsd:attribute name="name" type="xsd:string" use="required" />
+							<xsd:attribute name="force-array" type="xsd:boolean"
+								default="false" />
+							<xsd:attribute name="eval" type="xsd:boolean"
+								default="false" />
+							<xsd:attribute name="inherit" type="xsd:boolean"
+								default="false" />
+						</xsd:extension>
+					</xsd:simpleContent>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="child" type="wb:datarow" minOccurs="0"
+				maxOccurs="unbounded" />
+		</xsd:sequence>
+		<xsd:attribute name="table" type="xsd:string" use="required" />
+		<xsd:attribute name="var" type="xsd:ID" />
+	</xsd:complexType>
+
+	<xsd:complexType name="variable">
+		<xsd:sequence>
+			<xsd:element name="label" type="xsd:string" />
+			<xsd:element name="description" type="xsd:string"
+				minOccurs="0" />
+			<xsd:element name="default" type="xsd:string" minOccurs="0" />
+			<xsd:element name="length" type="xsd:positiveInteger"
+				minOccurs="0" />
+			<xsd:element name="inputType" default="text" minOccurs="0">
+				<xsd:simpleType>
+					<xsd:restriction base="xsd:string">
+						<xsd:enumeration value="text" />
+						<xsd:enumeration value="password" />
+						<xsd:enumeration value="textarea" />
+						<xsd:enumeration value="select" />
+						<xsd:enumeration value="checkbox" />
+						<xsd:enumeration value="radio" />
+						<xsd:enumeration value="radioTable" />
+						<xsd:enumeration value="inputUnit" />
+						<xsd:enumeration value="trbl" />
+						<xsd:enumeration value="chmod" />
+						<xsd:enumeration value="pageTree" />
+						<xsd:enumeration value="tableWizard" />
+						<xsd:enumeration value="listWizard" />
+						<xsd:enumeration value="optionWizard" />
+						<xsd:enumeration value="moduleWizard" />
+						<xsd:enumeration value="checkboxWizard" />
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+			<xsd:choice minOccurs="0">
+				<xsd:element name="options">
+					<xsd:complexType>
+						<xsd:choice minOccurs="0" maxOccurs="unbounded">
+							<xsd:element name="option">
+								<xsd:complexType>
+									<xsd:simpleContent>
+										<xsd:extension base="xsd:string">
+											<xsd:attribute name="value" type="xsd:string" use="required" />
+										</xsd:extension>
+									</xsd:simpleContent>
+								</xsd:complexType>
+							</xsd:element>
+						</xsd:choice>
+					</xsd:complexType>
+				</xsd:element>
+				<xsd:element name="options_callback" type="wb:callback" />
+				<xsd:element name="foreignKey" type="xsd:string" />
+			</xsd:choice>
+			<xsd:element name="reference" minOccurs="0">
+				<xsd:complexType>
+					<xsd:choice minOccurs="0" maxOccurs="unbounded">
+						<xsd:element name="ref">
+							<xsd:complexType>
+								<xsd:simpleContent>
+									<xsd:extension base="xsd:string">
+										<xsd:attribute name="key" type="xsd:string" use="required" />
+									</xsd:extension>
+								</xsd:simpleContent>
+							</xsd:complexType>
+						</xsd:element>
+					</xsd:choice>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="explanation" type="xsd:string"
+				minOccurs="0" />
+			<xsd:element name="inputFieldCallback" type="wb:callback"
+				minOccurs="0" />
+			<xsd:element name="eval" minOccurs="0">
+				<xsd:complexType>
+					<xsd:choice>
+						<xsd:element name="helpwizard" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="mandatory" type="xsd:boolean" default="true"
+							minOccurs="0" />
+						<xsd:element name="maxlength" type="xsd:positiveInteger"
+							minOccurs="0" />
+						<xsd:element name="minlength" type="xsd:positiveInteger"
+							minOccurs="0" />
+						<xsd:element name="fallback" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="rgxp" minOccurs="0">
+							<xsd:simpleType>
+								<xsd:restriction base="xsd:string">
+									<xsd:enumeration value="digit" />
+									<xsd:enumeration value="alpha" />
+									<xsd:enumeration value="alnum" />
+									<xsd:enumeration value="extnd" />
+									<xsd:enumeration value="prcnt" />
+									<xsd:enumeration value="date" />
+									<xsd:enumeration value="time" />
+									<xsd:enumeration value="datim" />
+									<xsd:enumeration value="email" />
+									<xsd:enumeration value="friendly" />
+									<xsd:enumeration value="url" />
+									<xsd:enumeration value="phone" />
+								</xsd:restriction>
+							</xsd:simpleType>
+						</xsd:element>
+						<xsd:element name="cols" type="xsd:positiveInteger"
+							minOccurs="0" />
+						<xsd:element name="rows" type="xsd:positiveInteger"
+							minOccurs="0" />
+						<xsd:element name="wrap" minOccurs="0">
+							<xsd:simpleType>
+								<xsd:restriction base="xsd:string">
+									<xsd:enumeration value="off" />
+									<xsd:enumeration value="soft" />
+									<xsd:enumeration value="hard" />
+								</xsd:restriction>
+							</xsd:simpleType>
+						</xsd:element>
+						<xsd:element name="multiple" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="size" type="xsd:positiveInteger"
+							minOccurs="0" />
+						<xsd:element name="style" type="xsd:string" minOccurs="0" />
+						<xsd:element name="rte" minOccurs="0">
+							<xsd:simpleType>
+								<xsd:restriction base="xsd:string">
+									<xsd:enumeration value="tinyMCE" />
+									<xsd:enumeration value="tinyNews" />
+									<xsd:enumeration value="tinyFlash" />
+								</xsd:restriction>
+							</xsd:simpleType>
+						</xsd:element>
+						<xsd:element name="submitOnChange" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="nospace" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="allowHtml" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="preserveTags" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="decodeEntities" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="doNotSaveEmpty" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="alwaysSave" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="spaceToUnderscore" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="unique" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="encrypt" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="trailingSlash" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="files" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="filesOnly" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="extensions" type="xsd:string"
+							minOccurs="0" />
+						<xsd:element name="path" type="xsd:boolean" minOccurs="0" />
+						<xsd:element name="fieldType" minOccurs="0">
+							<xsd:simpleType>
+								<xsd:restriction base="xsd:string">
+									<xsd:enumeration value="checkbox" />
+									<xsd:enumeration value="radio" />
+								</xsd:restriction>
+							</xsd:simpleType>
+						</xsd:element>
+						<xsd:element name="includeBlankOption" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="blankOptionLabel" type="xsd:string"
+							minOccurs="0" />
+						<xsd:element name="findInSet" type="xsd:boolean"
+							minOccurs="0" />
+						<xsd:element name="datepicker" type="xsd:string"
+							minOccurs="0" />
+					</xsd:choice>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="wizard" type="wb:callback" minOccurs="0" />
+		</xsd:sequence>
+		<xsd:attribute name="name" type="xsd:string" use="required" />
+	</xsd:complexType>
+
+	<xsd:complexType name="callback">
+		<xsd:attribute name="class" type="xsd:string" />
+		<xsd:attribute name="method" type="xsd:string" />
+	</xsd:complexType>
+</xsd:schema>

@@ -1,0 +1,776 @@
+<?php if (!defined('TL_ROOT')) die('You can not access this file directly!');
+
+/**
+ * Contao Open Source CMS
+ * Copyright (C) 2005-2010 Leo Feyer
+ *
+ * Formerly known as TYPOlight Open Source CMS.
+ *
+ * This program is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation, either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this program. If not, please visit the Free
+ * Software Foundation website at <http://www.gnu.org/licenses/>.
+ *
+ * PHP version 5
+ * @copyright  InfinitySoft 2010
+ * @author     Tristan Lins <tristan.lins@infinitysoft.de>
+ * @package    Website Builder
+ * @license    http://opensource.org/licenses/lgpl-3.0.html
+ */
+
+
+/**
+ * Class WebsiteBuilderDatasetImport
+ *
+ * Website Builder dataset import.
+ * @copyright  InfinitySoft 2010
+ * @author     Tristan Lins <tristan.lins@infinitysoft.de>
+ * @package    Website Builder
+ */
+class WebsiteBuilderDatasetImport extends BackendModule
+{
+	private static $VAR_REPLACE_REGEXP = '#\$(\w+(?:(?:\.|->)\w+)*|\{([^\}]+)\})#';
+	
+	
+	/**
+	 * Template
+	 * @var string
+	 */
+	protected $strTemplate = 'be_website_builder_dataset_import';
+	
+	
+	protected $arrVariables;
+	
+	
+	protected $arrLateUpdate;
+	
+	
+	protected $arrCreated;
+	
+	
+	public function __construct()
+	{
+		parent::__construct();
+		$this->import('BackendUser', 'User');
+	}
+	
+	
+	protected function convertCallback(DOMNode &$domNodeCallback, DOMXPath &$xpath)
+	{
+		$strClass = $xpath->evaluate('string(@class)');
+		$strMethod = $xpath->evaluate('string(@method)');
+		return array($strClass, $strMethod);
+	}
+	
+	
+	protected function convertXML2Widget(DOMNode $domNode, DOMXPath &$xpath)
+	{
+		$arrData = array();
+		
+		for ($i=0; $i<$domNode->childNodes->length; $i++)
+		{
+			$nodeChild = $domNode->childNodes->item($i);
+			$strName = $nodeChild->localName;
+			
+			if (empty($strName))
+			{
+				continue;
+			}
+			
+			switch ($strName)
+			{
+			case 'label':
+				if (!isset($arrData['label']))
+				{
+					$arrData['label'] = array('', '');
+				}
+				$arrData['label'][0] = $nodeChild->textContent;
+				break;
+				
+			case 'description':
+				if (!isset($arrData['label']))
+				{
+					$arrData['label'] = array('', '');
+				}
+				$arrData['label'][1] = $nodeChild->textContent;
+				break;
+				
+			case 'options':
+				$arrOptions = array();
+				$nodesOption = $xpath->query('wb:option', $nodeChild);
+				for ($j=0; $j<$nodesOption; $j++)
+				{
+					$nodeOption = $nodesOption->item($j);
+					$strValue = $xpath->evaluate('string(@value)', $nodeOption);
+					$strLabel = $nodeOption->textContent;
+					$arrOptions[] = array('value'=>$strValue, 'label'=>$strLabel);
+				}
+				$arrData['options'] = $arrOptions;
+				break;
+				
+			case 'reference':
+				$arrRefs = array();
+				$nodesRef = $xpath->query('wb:ref', $nodeChild);
+				for ($j=0; $j<$nodesRef; $j++)
+				{
+					$nodeRef = $nodesRef->item($j);
+					$strKey = $xpath->evaluate('string(@key)', $nodeRef);
+					$strLabel = $nodeRef->textContent;
+					$arrRefs[$strKey] = $strLabel;
+				}
+				$arrData['reference'] = $arrRefs;
+				break;
+				
+			case 'options_callback';
+			case 'inputFieldCallback':
+				$arrData[$strName] = $this->convertCallback($nodeChild, $xpath);
+				break;
+				
+			case 'eval':
+				$arrData['eval'] = $this->convertXML2Widget($nodeChild, $xpath);
+				break;
+				
+			case 'helpwizard':
+			case 'mandatory':
+			case 'fallback':
+			case 'multiple':
+			case 'submitOnChange':
+			case 'nospace':
+			case 'allowHtml':
+			case 'preserveTags':
+			case 'decodeEntities':
+			case 'doNotSaveEmpty':
+			case 'alwaysSave':
+			case 'spaceToUnderscore':
+			case 'unique':
+			case 'encrypt':
+			case 'trailingSlash':
+			case 'files':
+			case 'filesOnly':
+			case 'includeBlankOption':
+			case 'findInSet':
+				$arrData[$strName] = (trim($nodeChild->textContent) == 'true');
+				break;
+				
+			default:
+				$arrData[$strName] = $nodeChild->textContent;
+			}
+		}
+		return $arrData;
+	}
+	
+	
+	protected function importDatarow(DOMNode $domNode, DOMXPath &$xpath, $varPid = false)
+	{
+		$strVar = $xpath->evaluate('string(@var)', $domNode);
+		$strTable = $xpath->evaluate('string(@table)', $domNode);
+		
+		$objConnector = new libContaoConnector($strTable, 'id', '0');
+		
+		// overwrite id=0 with insert id
+		$objConnector->__colAlias = $objConnector->id;
+		
+		// store as created row
+		$this->arrCreated[$strTable][] = $objConnector->id;
+		
+		// load default values
+		$this->loadDataContainer($strTable);
+		if (is_array($GLOBALS['TL_DCA'][$strTable]['fields']))
+		{
+			foreach ($GLOBALS['TL_DCA'][$strTable]['fields'] as $strName => $arrField)
+			{
+				if (isset($arrField['default']))
+				{
+					$objConnector->$strName = $arrField['default'];
+				}
+			}
+		}
+		
+		if ($varPid)
+		{
+			$objConnector->pid = $varPid;
+		}
+		
+		$arrLateUpdate = array();
+		
+		// fill the data fields
+		$nodesField = $xpath->query('wb:field', $domNode);
+		for ($i=0; $i<$nodesField->length; $i++)
+		{
+			$nodeField = $nodesField->item($i);
+			
+			$strName = $xpath->evaluate('string(@name)', $nodeField);
+			$blnInherit = $xpath->evaluate('boolean(@inherit)', $nodeField);
+			$blnEval = $xpath->evaluate('boolean(@eval)', $nodeField);
+			$blnForceArray = $xpath->evaluate('boolean(@force-array)', $nodeField);
+			$strValue = $nodeField->textContent;
+			
+			// inherit from parent
+			if ($blnInherit)
+			{
+				if ($varPid)
+				{
+					$strPid = $varPid;
+				}
+				else
+				{
+					$strPid = $objConnector->pid;
+				}
+				if (strlen($strPid))
+				{
+					$objParent = $this->Database->prepare("
+							SELECT
+								*
+							FROM
+								`$strTable`
+							WHERE
+								`id`=?")
+						->executeUncached($strPid);
+					if ($objParent->next())
+					{
+						$strValue = $objParent->$strName;
+					}
+					else
+					{
+						throw new Exception('Could not inherit "' . $strName . '" from "' . $strTable . '", parent id "' . $strPid . '" was not found!');
+					}
+				}
+			}
+			
+			// replace all variables
+			try
+			{
+				$strValue = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $strValue);
+			}
+			// variable was not found
+			catch (Exception $e)
+			{
+				// also add to late update array
+				$arrLateUpdate[$strName] = array
+				(
+					'eval' => $blnEval,
+					'forceArray' => $blnForceArray,
+					'value' => $strValue
+				);
+				continue;
+			}
+			
+			// evaluate as php code
+			if ($blnEval)
+			{
+				if (false === eval('$strEvaluatedValue = '.$strValue.';'))
+				{
+					throw new Exception('Evaluation of value "' . htmlentities($strValue) . '" failed for field "' . $strName . '"!');
+				}
+				else
+				{
+					$strValue = $strEvaluatedValue;
+				}
+			}
+			
+			// force build of an array
+			if ($blnForceArray && !is_array($strValue))
+			{
+				$strValue = array($strValue);
+			}
+			
+			$objConnector->$strName = $strValue;
+		}
+		
+		if ($this->Database->fieldExists('alias', $strTable) && empty($objConnector->alias))
+		{
+			$strAlias = standardize(trim(empty($objConnector->name) ? $objConnector->title : $objConnector->name));
+			
+			if ($strAlias)
+			{
+				$objAlias = $this->Database->prepare("
+						SELECT
+							*
+						FROM
+							`$strTable`
+						WHERE
+							`alias`=?")
+					->executeUncached($strAlias);
+				if ($objAlias->numRows > 0)
+				{
+					$strAlias .= '.' . $objConnector->id;
+				}
+				
+				$objConnector->alias = $strAlias;
+			}
+		}
+
+		if ($this->Database->fieldExists('sorting', $strTable))
+		{
+			if ($this->Database->fieldExists('pid', $strTable))
+			{
+				$objSorting = $this->Database->prepare("
+						SELECT
+							MAX(`sorting`) as `sorting`
+						FROM
+							`$strTable`
+						WHERE
+							`pid`=?")
+					->executeUncached($varPid);
+			}
+			else
+			{
+				$objSorting = $this->Database->executeUncached("
+						SELECT
+							MAX(`sorting`) as `sorting`
+						FROM
+							`$strTable`");
+			}
+			$objConnector->sorting = ($objSorting->sorting > 0 ? $objSorting->sorting : 128) + 128;
+		}
+		
+		// store the data
+		$objConnector->Sync();
+		
+		// set the local var
+		if ($strVar)
+		{
+			$this->arrVariables[$strVar] = $objConnector;
+		}
+		
+		// add late update variables
+		if (count($arrLateUpdate))
+		{
+			if (!isset($this->arrLateUpdate[$strTable]))
+			{
+				$this->arrLateUpdate[$strTable] = array();
+			}
+			$this->arrLateUpdate[$strTable][$objConnector->id] = $arrLateUpdate;
+		}
+		
+		// import the child records
+		$nodesChild = $xpath->query('wb:child', $domNode);
+		for ($i=0; $i<$nodesChild->length; $i++)
+		{
+			$this->importDatarow($nodesChild->item($i), $xpath, $objConnector->id);
+		}
+	}
+	
+	
+	protected function replaceVariable($arrMatches)
+	{
+		if (!empty($arrMatches[2]))
+		{
+			$strKey = $arrMatches[2];
+		}
+		else
+		{
+			$strKey = $arrMatches[1];
+		}
+		
+		$arrKeys = preg_split('#\.|->#', $strKey);
+		
+		if (count($arrKeys) > 1)
+		{
+			$strOriginalKey = $strKey;
+			$varTmp = $this->arrVariables;
+			foreach ($arrKeys as $strKey)
+			{
+				if ($strKey == 'this')
+				{
+					$varTmp = $this;
+				}
+				else if (is_array($varTmp) && isset($varTmp[$strKey]))
+				{
+					$varTmp = $varTmp[$strKey];
+				}
+				else if (is_object($varTmp))
+				{
+					$varTmp = $varTmp->$strKey;
+				}
+				else
+				{
+					throw new Exception('Variable part "' . $strKey . '" from "' . $strOriginalKey . '" not available.<br/><span style="white-space:pre">' . htmlentities($arrMatches[0]) . '</span><br/><span style="white-space:pre">' . htmlentities(print_r(array_keys($this->arrVariables), true)) . '</span>');
+				}
+			}
+			return is_array($varTmp) ? serialize($varTmp) : $varTmp;
+		}
+		else if (isset($this->arrVariables[$strKey]))
+		{
+			return is_array($this->arrVariables[$strKey]) ? serialize($this->arrVariables[$strKey]) : is_object($this->arrVariables[$strKey]) ? $this->arrVariables[$strKey]->id : $this->arrVariables[$strKey];
+		}
+		else if (isset($GLOBALS['TL_CONFIG'][$strKey]))
+		{
+			return $GLOBALS['TL_CONFIG'][$strKey];
+		}
+		
+		throw new Exception('Variable "' . $strKey . '" not available.<br/><span style="white-space:pre">' . htmlentities($arrMatches[0]) . '</span><br/><span style="white-space:pre">' . htmlentities(print_r(array_keys($this->arrVariables), true)) . '</span>');
+	}
+	
+	
+	protected function generateDCA()
+	{
+		if (strlen($this->Input->get('dataset')))
+		{
+			$arrDatasets = deserialize($this->Session->get('datasets'));
+			$arrDataset = $arrDatasets[$this->Input->get('dataset')];
+			if (is_array($arrDataset))
+			{
+				$doc = new DOMDocument();
+				$doc->loadXML($arrDataset['xml']);
+				
+				// only accept valid xml
+				if ($doc->schemaValidate(TL_ROOT . '/system/modules/website_builder/config/website_builder.xsd'))
+				{
+					$xpath = new DOMXPath($doc);
+					$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
+				
+					$nodesVariable = $xpath->query('wb:variable');
+					for ($i=0; $i<$nodesVariable->length; $i++)
+					{
+						$nodeVariable = $nodesVariable->item($i);
+						
+						$strName = $xpath->evaluate('string(@name)', $nodeVariable);
+						$arrData = $this->convertXML2Widget($nodeVariable, $xpath);
+						
+						// default inputType
+						if (empty($arrData['inputType']))
+						{
+							$arrData['inputType'] = 'text';
+						}
+						if (!isset($arrData['eval']['mandatory']))
+						{
+							$arrData['eval']['mandatory'] = true;
+						}
+						$arrData['eval']['required'] = $arrData['eval']['mandatory'];
+						
+						$strClass = $GLOBALS['BE_FFL'][$arrData['inputType']];
+						if (!$strClass)
+						{
+							$_SESSION['TL_ERROR'][] = 'Unknown input type: "' . $strClass . '" given for field "' . $strName . '"!';
+							$this->redirect('contao/main.php?do=dataset_import');
+						}
+						
+						// fill the virtual dca
+						$GLOBALS['TL_DCA']['tl_dataset_import']['fields'][$strName] = $arrData;
+					}
+				}
+			}
+		}
+	}
+	
+	
+	protected function mkdirs($strPath)
+	{
+		if (!is_dir($strPath))
+		{
+			$this->mkdirs(dirname($strPath));
+			mkdir($strPath);
+		}
+	}
+	
+	
+	/**
+	 * Generate module
+	 */
+	protected function compile()
+	{
+		$this->loadLanguageFile('tl_website_builder_dataset_import');
+		
+		if (strlen($this->Input->get('dataset')))
+		{
+			$arrDatasets = deserialize($this->Session->get('datasets'));
+			$arrDataset = $arrDatasets[$this->Input->get('dataset')];
+			if (is_array($arrDataset))
+			{
+				$doc = new DOMDocument();
+				$doc->loadXML($arrDataset['xml']);
+				
+				// only accept valid xml
+				if ($doc->schemaValidate(TL_ROOT . '/system/modules/website_builder/config/website_builder.xsd'))
+				{
+					$xpath = new DOMXPath($doc);
+					$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
+					
+					$arrWidgets = array();
+					
+					$nodesVariable = $xpath->query('wb:variable');
+					for ($i=0; $i<$nodesVariable->length; $i++)
+					{
+						$nodeVariable = $nodesVariable->item($i);
+						
+						$strName = $xpath->evaluate('string(@name)', $nodeVariable);
+						$arrData = $this->convertXML2Widget($nodeVariable, $xpath);
+						
+						// default inputType
+						if (empty($arrData['inputType']))
+						{
+							$arrData['inputType'] = 'text';
+						}
+						if (!isset($arrData['eval']['mandatory']))
+						{
+							$arrData['eval']['mandatory'] = true;
+						}
+						$arrData['eval']['required'] = $arrData['eval']['mandatory'];
+						
+						if (!$arrData['eval']['required'])
+						{
+							$arrData['label'][0] .= ' (optional)';
+						}
+						
+						$strClass = $GLOBALS['BE_FFL'][$arrData['inputType']];
+						if (!$strClass)
+						{
+							$_SESSION['TL_ERROR'][] = 'Unknown input type: "' . $strClass . '" given for field "' . $strName . '"!';
+							$this->redirect('contao/main.php?do=dataset_import');
+						}
+						
+						$arrWidget = $this->prepareForWidget($arrData, $strName, '', $strName, 'tl_dataset_import');
+						$objWidget = new $strClass($arrWidget);
+						
+						$arrWidgets[$strName] = $objWidget;
+					}
+					
+					if (	!count($arrWidgets) // no variables
+						||	$this->Input->post('FORM_SUBMIT') == 'dataset_import')
+					{
+						$this->arrVariables = array();
+						$this->arrLateUpdate = array();
+						$this->arrCreated = array();
+						
+						$blnDoNotSubmit = false;
+						foreach ($arrWidgets as $strName => $objWidget)
+						{
+							$objWidget->validate();
+							$this->arrVariables[$strName] = $objWidget->value;
+							if ($objWidget->hasErrors())
+							{
+								$blnDoNotSubmit = true;
+							}
+						}
+						
+						// the final import
+						if (!$blnDoNotSubmit)
+						{
+							$nodesRow = $xpath->evaluate('wb:row', $nodeDataset);
+							
+							try
+							{
+								for ($i=0; $i<$nodesRow->length; $i++)
+								{
+									$this->importDatarow($nodesRow->item($i), $xpath);
+								}
+								
+								foreach ($this->arrLateUpdate as $strTable => $arrTable)
+								{
+									foreach ($arrTable as $strId => $arrLateUpdate)
+									{
+										$objConnector = new libContaoConnector($strTable, 'id', $strId);
+										foreach ($arrLateUpdate as $strName => $arrValue)
+										{
+											// no try-catch here, because if variable is not available here, i can not fallback!
+											$strValue = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $arrValue['value']);
+											
+											if ($arrValue['eval'])
+											{
+												if (false === eval('$strEvaluatedValue = '.$strValue.';'))
+												{
+													throw new Exception('Evaluation of value "' . htmlentities($strValue) . '" failed for field "' . $strName . '"!');
+												}
+												else
+												{
+													$strValue = $strEvaluatedValue;
+												}
+											}
+											
+											if ($arrValue['forceArray'] && !is_array($strValue))
+											{
+												$strValue = array($strValue);
+											}
+											
+											$objConnector->$strName = $strValue;
+										}
+										// store the data
+										$objConnector->Sync();
+										// and destroy connector
+										unset($objConnector);
+									}
+								}
+								
+								$nodesMkdir = $xpath->evaluate('wb:mkdir', $nodeDataset);
+								for ($i=0; $i<$nodesMkdir->length; $i++)
+								{
+									$strPath = $nodesMkdir->item($i)->textContent;
+									$strPath = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $strPath);
+									// create the directory
+									$this->mkdirs(TL_ROOT . '/' . $strPath);
+								}
+								
+								$nodesMkfile = $xpath->evaluate('wb:mkfile', $nodeDataset);
+								for ($i=0; $i<$nodesMkfile->length; $i++)
+								{
+									$strPath = $nodesMkfile->item($i)->textContent;
+									$strPath = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $strPath);
+									// create parent directory
+									$this->mkdirs(dirname(TL_ROOT . '/' . $strPath));
+									// create the file
+									file_put_contents(TL_ROOT . '/' . $strPath, "");
+								}
+								
+								$nodesLoad = $xpath->evaluate('wb:load', $nodeDataset);
+								for ($i=0; $i<$nodesLoad->length; $i++)
+								{
+									$nodeLoad = $nodesLoad->item($i);
+									$strTarget = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $xpath->evaluate('string(@target)', $nodeLoad));
+									$blnUnzip = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $xpath->evaluate('boolean(@unzip)', $nodeLoad));
+									$strSource = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $nodeLoad->textContent);
+									
+									$strName = basename($strSource);
+									// absolutize source
+									if (!(	preg_match('#^https?://#', $strSource)
+										||	preg_match('#^/#', $strSource)))
+									{
+										$strSource = TL_ROOT . '/' . $strSource;
+									}
+									
+									if (false === @copy($strSource, TL_ROOT . '/' . $strTarget . '/' . $strName))
+									{
+										throw new Exception('Copy "' . $strSource . '" to "' . $strTarget . '/' . $strName . '" failed!');
+									}
+									
+									if ($blnUnzip)
+									{
+										$zipReader = new ZipReader($strTarget . '/' . $strName);
+										while ($zipReader->next())
+										{
+											$this->mkdirs(TL_ROOT . '/' . $strTarget . '/' . $zipReader->file_dirname);
+											file_put_contents(TL_ROOT . '/' . $strTarget . '/' . $zipReader->file_name, $zipReader->unzip());
+										}
+										unset($zipReader);
+										@unlink(TL_ROOT . '/' . $strTarget . '/' . $strName);
+									}
+								}
+								
+								$_SESSION['TL_INFO'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['success'];
+								$this->redirect('contao/main.php?do=dataset_import');
+							}
+							catch(Exception $e)
+							{
+								// delete all created rows!
+								foreach ($this->arrCreated as $strTable => $arrIds)
+								{
+									if (count($arrIds))
+									{
+										$this->Database->executeUncached("DELETE FROM $strTable WHERE id IN (" . implode(',', $arrIds) . ")");
+									}
+								}
+								$_SESSION['TL_ERROR'][] = $e->getMessage();
+							}
+						}
+					}
+					
+					$this->Template->variables = $arrWidgets;
+					return;
+				}
+			}
+			$this->redirect('contao/main.php?do=dataset_import');
+		}
+		
+		// no operation, list importable datasets
+		$GLOBALS['TL_CONFIG']['website_builder_datasets'] = deserialize($GLOBALS['TL_CONFIG']['website_builder_datasets'], true);
+		if (is_array($GLOBALS['TL_CONFIG']['website_builder_datasets']) && count($GLOBALS['TL_CONFIG']['website_builder_datasets']))
+		{
+			$arrDatasets = array();
+			
+			for ($n=0; $n<count($GLOBALS['TL_CONFIG']['website_builder_datasets']); $n++)
+			{
+				$strDataset = $GLOBALS['TL_CONFIG']['website_builder_datasets'][$n];
+				
+				if (	preg_match('#^https?://#', $strDataset)
+					||	preg_match('#^/#', $strDataset)
+					||	file_exists($strDataset = TL_ROOT . '/' . $strDataset))
+				{
+					$strXML = @file_get_contents($strDataset);
+					// read the xml
+					if ($strXML)
+					{
+						$doc = new DOMDocument();
+						// load the xml
+						if (false !== @$doc->loadXML($strXML))
+						{
+							// only accept valid files
+							if ($doc->schemaValidate(TL_ROOT . '/system/modules/website_builder/config/website_builder.xsd'))
+							{
+								$xpath = new DOMXPath($doc);
+								$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
+								
+								$nodesImport = $xpath->query('//wb:import');
+								for ($i=0; $i<$nodesImport->length; $i++)
+								{
+									$strImport = $nodesImport->item($i)->textContent;
+									if (!(	preg_match('#^https?://#', $strImport)
+										||	preg_match('#^/#', $strImport)
+										||	file_exists(TL_ROOT . '/' . $strDataset)))
+									{
+										$strImport = preg_replace('#/[^/]*$#', '/', $strDataset) . $strImport;
+									}
+									$GLOBALS['TL_CONFIG']['website_builder_datasets'][] = $strImport;
+								}
+								
+								$nodesDataset = $xpath->query('//wb:dataset');
+								for ($i=0; $i<$nodesDataset->length; $i++)
+								{
+									$nodeDataset = $nodesDataset->item($i);
+									
+									do
+									{
+										$strKey = substr(md5(time()*rand()), 0, 8);
+									}
+									while (isset($arrDatasets[$strKey]));
+									
+									$arrDatasets[$strKey] = array(
+										'id'          => $strKey,
+										'name'        => $xpath->evaluate('string(wb:name/text())', $nodeDataset),
+										'description' => $xpath->evaluate('string(wb:description/text())', $nodeDataset),
+										'xml'         => $doc->saveXML($nodeDataset)
+									);
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			if (count($arrDatasets))
+			{
+				$this->Session->set('datasets', serialize($arrDatasets));
+				$this->Template->datasets = $arrDatasets;
+			}
+			else
+			{
+				$_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['faulty_configuration'];
+			}
+		}
+		
+		// no datasets configured
+		else
+		{
+			$_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['missing_configuration'];
+		}
+	}
+	
+	
+	public function loadDataContainer($strName)
+	{
+		if ($strName == 'tl_dataset_import')
+		{
+			$this->generateDCA();
+		}
+	}
+}
+
+?>

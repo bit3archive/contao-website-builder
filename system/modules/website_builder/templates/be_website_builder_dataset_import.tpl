@@ -1,0 +1,66 @@
+<?php if (is_array($this->variables)): ?>
+<div id="tl_buttons">
+<a href="contao/main.php?do=dataset_import" class="header_back" title="<?php echo specialchars($GLOBALS['TL_LANG']['MSC']['backBT']); ?>" accesskey="b" onclick="Backend.getScrollOffset();"><?php echo $GLOBALS['TL_LANG']['MSC']['backBT']; ?></a>
+</div>
+
+<div id="tl_website_builder_dataset_import_variables">
+
+<h2 class="sub_headline"><?php echo $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['variables']; ?></h2>
+
+<?php echo $this->getMessages(); ?>
+
+<form action="contao/main.php?do=dataset_import&dataset=<?php echo specialchars($this->Input->get('dataset')); ?>" method="post">
+<input type="hidden" name="FORM_SUBMIT" value="dataset_import">
+<div class="tl_formbody_edit">
+<fieldset id="pal_variables" class="tl_box block">
+<?php
+foreach ($this->variables as $variable):
+	?><div>
+	<h3><?php echo $variable->generateLabel(); ?></h3>
+	<?php echo $variable->generate(); ?>
+	<?php if (!$variable->hasErrors()): ?><p class="tl_help<?php if (!$GLOBALS['TL_CONFIG']['oldBeTheme']): echo ' tl_tip'; endif; ?>"><?php echo $variable->description; ?></p><?php
+	else: ?><p class="tl_error"><?php echo $variable->getErrorAsHTML(); ?></p><?php endif; ?>
+	</div><?php
+endforeach;
+?>
+</fieldset>
+</div>
+<div class="tl_formbody_submit">
+<div class="tl_submit_container">
+<input type="submit" name="save" id="save" class="tl_submit" accesskey="s" value="<?php echo $GLOBALS['TL_LANG']['MSC']['save']; ?>">
+</div>
+</div>
+</form>
+
+</div>
+
+<?php elseif (is_array($this->datasets)): ?>
+<div id="tl_website_builder_dataset_import_select">
+
+<h2 class="sub_headline"><?php echo $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['dataset_selection']; ?></h2>
+
+<?php echo $this->getMessages(); ?>
+
+<ul>
+<?php foreach ($this->datasets as $dataset): ?>
+	<li>
+		<h3><?php echo $dataset['name']; ?></h3>
+		<?php if ($dataset['description']): ?><p><?php echo $dataset['description']; ?></p><?php endif; ?>
+		<form action="contao/main.php" method="get">
+			<input type="hidden" name="do" value="dataset_import" />
+			<input type="hidden" name="dataset" value="<?php echo specialchars($dataset['id']); ?>" />
+			<input type="hidden" name="table" value="tl_dataset_import" />
+			<input type="submit" value="<?php echo specialchars($GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['submit']); ?>" />
+		</form>
+	</li>
+<?php endforeach; ?>
+</ul>
+
+</div>
+<?php else: ?>
+
+<?php echo $this->getMessages(); ?>
+
+<br/>
+
+<?php endif; ?>
