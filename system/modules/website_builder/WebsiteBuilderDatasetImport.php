@@ -48,15 +48,30 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	protected $strTemplate = 'be_website_builder_dataset_import';
 	
 	
+	/**
+	 * The local variables
+	 * @var array
+	 */
 	protected $arrVariables;
 	
 	
+	/**
+	 * Information about "late update" fields, stored as reference of table => field => value
+	 * @var array
+	 */
 	protected $arrLateUpdate;
 	
 	
+	/**
+	 * List of all created elements ids to roll back the import.
+	 * @var array
+	 */
 	protected $arrCreated;
 	
 	
+	/**
+	 * Initialise the backend module.
+	 */
 	public function __construct()
 	{
 		parent::__construct();
@@ -64,6 +79,13 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	}
 	
 	
+	/**
+	 * Convert a callback node into a php callback.
+	 * 
+	 * @param DOMNode $domNodeCallback
+	 * @param DOMXPath $xpath
+	 * @return array
+	 */
 	protected function convertCallback(DOMNode &$domNodeCallback, DOMXPath &$xpath)
 	{
 		$strClass = $xpath->evaluate('string(@class)');
@@ -72,6 +94,13 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	}
 	
 	
+	/**
+	 * Convert a node set into a widget compatible dca structure.
+	 * 
+	 * @param DOMNode $domNode
+	 * @param DOMXPath $xpath
+	 * @return array
+	 */
 	protected function convertXML2Widget(DOMNode $domNode, DOMXPath &$xpath)
 	{
 		$arrData = array();
@@ -81,6 +110,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			$nodeChild = $domNode->childNodes->item($i);
 			$strName = $nodeChild->localName;
 			
+			/* script text elements */
 			if (empty($strName))
 			{
 				continue;
@@ -88,6 +118,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			
 			switch ($strName)
 			{
+			/* the label */
 			case 'label':
 				if (!isset($arrData['label']))
 				{
@@ -95,7 +126,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 				$arrData['label'][0] = $nodeChild->textContent;
 				break;
-				
+			
+			/* the description part of the label */
 			case 'description':
 				if (!isset($arrData['label']))
 				{
@@ -103,7 +135,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 				$arrData['label'][1] = $nodeChild->textContent;
 				break;
-				
+			
+			/* convert options to an array */
 			case 'options':
 				$arrOptions = array();
 				$nodesOption = $xpath->query('wb:option', $nodeChild);
@@ -116,7 +149,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 				$arrData['options'] = $arrOptions;
 				break;
-				
+			
+			/* convert references to a hash map */
 			case 'reference':
 				$arrRefs = array();
 				$nodesRef = $xpath->query('wb:ref', $nodeChild);
@@ -130,15 +164,18 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				$arrData['reference'] = $arrRefs;
 				break;
 				
+			/* callback fields */
 			case 'options_callback';
 			case 'inputFieldCallback':
 				$arrData[$strName] = $this->convertCallback($nodeChild, $xpath);
 				break;
-				
+			
+			/* eval is a subset, also convert it to an array */
 			case 'eval':
 				$arrData['eval'] = $this->convertXML2Widget($nodeChild, $xpath);
 				break;
-				
+			
+			/* boolean fields */
 			case 'helpwizard':
 			case 'mandatory':
 			case 'fallback':
@@ -160,7 +197,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			case 'findInSet':
 				$arrData[$strName] = (trim($nodeChild->textContent) == 'true');
 				break;
-				
+			
+			/* a simple text containing field */
 			default:
 				$arrData[$strName] = $nodeChild->textContent;
 			}
@@ -169,6 +207,14 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	}
 	
 	
+	/**
+	 * Import datarows into the database.
+	 * 
+	 * @param DOMNode $domNode
+	 * @param DOMXPath $xpath
+	 * @param mixed $varPid
+	 * @throws Exception
+	 */
 	protected function importDatarow(DOMNode $domNode, DOMXPath &$xpath, $varPid = false)
 	{
 		$strVar = $xpath->evaluate('string(@var)', $domNode);
@@ -211,7 +257,9 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			$strName = $xpath->evaluate('string(@name)', $nodeField);
 			$blnInherit = $xpath->evaluate('boolean(@inherit)', $nodeField);
 			$blnEval = $xpath->evaluate('boolean(@eval)', $nodeField);
+			$blnEvalUser = $xpath->evaluate('boolean(@eval-user)', $nodeField);
 			$blnForceArray = $xpath->evaluate('boolean(@force-array)', $nodeField);
+			$blnNovars = $xpath->evaluate('boolean(@novars)', $nodeField);
 			$strValue = $nodeField->textContent;
 			
 			// inherit from parent
@@ -231,9 +279,9 @@ class WebsiteBuilderDatasetImport extends BackendModule
 							SELECT
 								*
 							FROM
-								`$strTable`
+								$strTable
 							WHERE
-								`id`=?")
+								id=?")
 						->executeUncached($strPid);
 					if ($objParent->next())
 					{
@@ -247,33 +295,58 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			}
 			
 			// replace all variables
-			try
+			if (!$blnNovars)
 			{
-				$strValue = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $strValue);
-			}
-			// variable was not found
-			catch (Exception $e)
-			{
-				// also add to late update array
-				$arrLateUpdate[$strName] = array
-				(
-					'eval' => $blnEval,
-					'forceArray' => $blnForceArray,
-					'value' => $strValue
-				);
-				continue;
+				try
+				{
+					$strValue = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $strValue);
+				}
+				// variable was not found
+				catch (Exception $e)
+				{
+					// also add to late update array
+					$arrLateUpdate[$strName] = array
+					(
+						'eval' => $blnEval,
+						'forceArray' => $blnForceArray,
+						'value' => $strValue
+					);
+					continue;
+				}
 			}
 			
 			// evaluate as php code
 			if ($blnEval)
 			{
-				if (false === eval('$strEvaluatedValue = '.$strValue.';'))
+				if (false === eval('$varEvaluatedValue = '.$strValue.';'))
 				{
+					unset($varEvaluatedValue);
 					throw new Exception('Evaluation of value "' . htmlentities($strValue) . '" failed for field "' . $strName . '"!');
 				}
 				else
 				{
-					$strValue = $strEvaluatedValue;
+					$strValue = $varEvaluatedValue;
+					unset($varEvaluatedValue);
+				}
+			}
+			
+			// evaluate as user assigning php code
+			if ($blnEvalUser)
+			{
+				if (false === eval($strValue))
+				{
+					unset($varEvaluatedValue);
+					throw new Exception('Evaluation of value "' . htmlentities($strValue) . '" failed for field "' . $strName . '"!');
+				}
+				else if (!isset($varEvaluatedValue))
+				{
+					unset($varEvaluatedValue);
+					throw new Exception('Evaluation of value "' . htmlentities($strValue) . '" for field "' . $strName . '" have to set the $varEvaluatedValue variable!');
+				}
+				else
+				{
+					$strValue = $varEvaluatedValue;
+					unset($varEvaluatedValue);
 				}
 			}
 			
@@ -296,9 +369,9 @@ class WebsiteBuilderDatasetImport extends BackendModule
 						SELECT
 							*
 						FROM
-							`$strTable`
+							$strTable
 						WHERE
-							`alias`=?")
+							alias=?")
 					->executeUncached($strAlias);
 				if ($objAlias->numRows > 0)
 				{
@@ -309,26 +382,27 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			}
 		}
 
+		// resorting the rows
 		if ($this->Database->fieldExists('sorting', $strTable))
 		{
 			if ($this->Database->fieldExists('pid', $strTable))
 			{
 				$objSorting = $this->Database->prepare("
 						SELECT
-							MAX(`sorting`) as `sorting`
+							MAX(sorting) as sorting
 						FROM
-							`$strTable`
+							$strTable
 						WHERE
-							`pid`=?")
+							pid=?")
 					->executeUncached($varPid);
 			}
 			else
 			{
 				$objSorting = $this->Database->executeUncached("
 						SELECT
-							MAX(`sorting`) as `sorting`
+							MAX(sorting) as sorting
 						FROM
-							`$strTable`");
+							$strTable");
 			}
 			$objConnector->sorting = ($objSorting->sorting > 0 ? $objSorting->sorting : 128) + 128;
 		}
@@ -361,6 +435,13 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	}
 	
 	
+	/**
+	 * Callback method for preg_replace_callback to replace variables.
+	 * 
+	 * @param array $arrMatches
+	 * @return string
+	 * @throws Exception
+	 */
 	protected function replaceVariable($arrMatches)
 	{
 		if (!empty($arrMatches[2]))
@@ -412,6 +493,9 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	}
 	
 	
+	/**
+	 * Generate the virtual dca structure.
+	 */
 	protected function generateDCA()
 	{
 		if (strlen($this->Input->get('dataset')))
@@ -464,6 +548,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	}
 	
 	
+	/**
+	 * Create directory path.
+	 * 
+	 * @param string $strPath
+	 */
 	protected function mkdirs($strPath)
 	{
 		if (!is_dir($strPath))
@@ -764,6 +853,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	}
 	
 	
+	/**
+	 * HOOK to create the virtual dca.
+	 * 
+	 * @param string $strName
+	 */
 	public function loadDataContainer($strName)
 	{
 		if ($strName == 'tl_dataset_import')
