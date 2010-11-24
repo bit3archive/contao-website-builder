@@ -75,7 +75,11 @@
 								default="false" />
 							<xsd:attribute name="eval" type="xsd:boolean"
 								default="false" />
+							<xsd:attribute name="eval-user" type="xsd:boolean"
+								default="false" />
 							<xsd:attribute name="inherit" type="xsd:boolean"
+								default="false" />
+							<xsd:attribute name="novars" type="xsd:boolean"
 								default="false" />
 						</xsd:extension>
 					</xsd:simpleContent>
