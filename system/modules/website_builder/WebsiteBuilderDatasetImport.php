@@ -757,7 +757,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 									}
 								}
 								
-								$_SESSION['TL_INFO'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['success'];
+								$this->log(preg_replace('#</?strong>#', '"', $_SESSION['TL_INFO'][] = sprintf($GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['success'], $xpath->evaluate('string(wb:name/text())', $nodeDataset))), 'WebsiteBuilderDatasetImport compile()', TL_INFO);
 								$this->redirect('contao/main.php?do=dataset_import');
 							}
 							catch(Exception $e)

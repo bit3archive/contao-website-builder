@@ -36,6 +36,6 @@ $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['variables'] = 'Variabl
 $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['missing_configuration'] = 'Sie müssen in den Einstellungen zuerst einige Datensatzdefinitions-Dateien konfigurieren, um diese Funktion nutzen zu können!';
 $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['faulty_configuration']  = 'Die Konfigurierten Datensatzdefinitions-Dateien enthalten keine brauchbaren Informationen, eventuell wurden die Dateien entfernt oder sind vorübergehend nicht verfügbar. Prüfen Sie Ihre Einstellungen!';
 
-$GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['success'] = 'Import abgeschlossen';
+$GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['success'] = 'Import von <strong>%s</strong> abgeschlossen';
 
 ?>
