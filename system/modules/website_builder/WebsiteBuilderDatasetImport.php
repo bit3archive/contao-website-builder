@@ -394,7 +394,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 							$strTable
 						WHERE
 							pid=?")
-					->executeUncached($varPid);
+					->executeUncached($objConnector->pid);
 			}
 			else
 			{
@@ -404,7 +404,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 						FROM
 							$strTable");
 			}
-			$objConnector->sorting = ($objSorting->sorting > 0 ? $objSorting->sorting : 128) + 128;
+			$objConnector->sorting = ($objSorting->sorting > 0 ? $objSorting->sorting : 0) + 128;
 		}
 		
 		// store the data
@@ -496,6 +496,43 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	/**
 	 * Generate the virtual dca structure.
 	 */
+	protected function generateDCAFrom(DOMDocument $doc, DOMXPath $xpath)
+	{
+		$nodesVariable = $xpath->query('wb:variable');
+		for ($i=0; $i<$nodesVariable->length; $i++)
+		{
+			$nodeVariable = $nodesVariable->item($i);
+			
+			$strName = $xpath->evaluate('string(@name)', $nodeVariable);
+			$arrData = $this->convertXML2Widget($nodeVariable, $xpath);
+			
+			// default inputType
+			if (empty($arrData['inputType']))
+			{
+				$arrData['inputType'] = 'text';
+			}
+			if (!isset($arrData['eval']['mandatory']))
+			{
+				$arrData['eval']['mandatory'] = true;
+			}
+			$arrData['eval']['required'] = $arrData['eval']['mandatory'];
+			
+			$strClass = $GLOBALS['BE_FFL'][$arrData['inputType']];
+			if (!$strClass)
+			{
+				$_SESSION['TL_ERROR'][] = 'Unknown input type: "' . $strClass . '" given for field "' . $strName . '"!';
+				$this->redirect('contao/main.php?do=dataset_import');
+			}
+			
+			// fill the virtual dca
+			$GLOBALS['TL_DCA']['tl_dataset_import']['fields'][$strName] = $arrData;
+		}
+	}
+	
+	
+	/**
+	 * Generate the virtual dca structure.
+	 */
 	protected function generateDCA()
 	{
 		if (strlen($this->Input->get('dataset')))
@@ -513,35 +550,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					$xpath = new DOMXPath($doc);
 					$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
 				
-					$nodesVariable = $xpath->query('wb:variable');
-					for ($i=0; $i<$nodesVariable->length; $i++)
-					{
-						$nodeVariable = $nodesVariable->item($i);
-						
-						$strName = $xpath->evaluate('string(@name)', $nodeVariable);
-						$arrData = $this->convertXML2Widget($nodeVariable, $xpath);
-						
-						// default inputType
-						if (empty($arrData['inputType']))
-						{
-							$arrData['inputType'] = 'text';
-						}
-						if (!isset($arrData['eval']['mandatory']))
-						{
-							$arrData['eval']['mandatory'] = true;
-						}
-						$arrData['eval']['required'] = $arrData['eval']['mandatory'];
-						
-						$strClass = $GLOBALS['BE_FFL'][$arrData['inputType']];
-						if (!$strClass)
-						{
-							$_SESSION['TL_ERROR'][] = 'Unknown input type: "' . $strClass . '" given for field "' . $strName . '"!';
-							$this->redirect('contao/main.php?do=dataset_import');
-						}
-						
-						// fill the virtual dca
-						$GLOBALS['TL_DCA']['tl_dataset_import']['fields'][$strName] = $arrData;
-					}
+					$this->generateDCAFrom($doc, $xpath);
 				}
 			}
 		}
@@ -584,6 +593,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				{
 					$xpath = new DOMXPath($doc);
 					$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
+					
+					$this->generateDCAFrom($doc, $xpath);
 					
 					$arrWidgets = array();
 					
@@ -645,10 +656,10 @@ class WebsiteBuilderDatasetImport extends BackendModule
 						// the final import
 						if (!$blnDoNotSubmit)
 						{
-							$nodesRow = $xpath->evaluate('wb:row', $nodeDataset);
-							
 							try
 							{
+								$nodesRow = $xpath->query('wb:row');
+								
 								for ($i=0; $i<$nodesRow->length; $i++)
 								{
 									$this->importDatarow($nodesRow->item($i), $xpath);
