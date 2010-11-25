@@ -658,7 +658,9 @@ class WebsiteBuilderDatasetImport extends BackendModule
 						{
 							try
 							{
-								$nodesRow = $xpath->query('wb:row');
+								$nodeDataset = $doc->documentElement;
+								
+								$nodesRow = $xpath->evaluate('wb:row', $nodeDataset);
 								
 								for ($i=0; $i<$nodesRow->length; $i++)
 								{
