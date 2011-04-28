@@ -14,7 +14,8 @@
 		<xsd:complexType>
 			<xsd:sequence>
 				<xsd:element ref="wb:dataset" minOccurs="0" maxOccurs="unbounded" />
-				<xsd:element name="import" type="xsd:string" minOccurs="0" maxOccurs="unbounded" />
+				<xsd:element name="import" type="xsd:string" minOccurs="0"
+					maxOccurs="unbounded" />
 			</xsd:sequence>
 		</xsd:complexType>
 	</xsd:element>
@@ -23,7 +24,7 @@
 		<xsd:annotation>
 			<xsd:documentation>
 				A single dataset, that can be imported.
-						</xsd:documentation>
+			</xsd:documentation>
 		</xsd:annotation>
 		<xsd:complexType>
 			<xsd:sequence>
@@ -44,8 +45,15 @@
 					</xsd:element>
 				</xsd:choice>
 				
-				<xsd:element name="row" type="wb:datarow" maxOccurs="unbounded" />
+				<xsd:element name="data" minOccurs="0" maxOccurs="unbounded">
+					<xsd:complexType>
+						<xsd:group ref="wb:datarow" />
+						<xsd:attribute name="place" type="xsd:string" use="required" />
+					</xsd:complexType>
+				</xsd:element>
 				
+				<xsd:element name="row" type="wb:datarow" minOccurs="0" maxOccurs="unbounded" />
+
 				<xsd:choice minOccurs="0" maxOccurs="unbounded">
 					<xsd:element name="mkdir" type="xsd:string" />
 					<xsd:element name="mkfile" type="xsd:string" />
@@ -61,33 +69,51 @@
 					</xsd:element>
 				</xsd:choice>
 			</xsd:sequence>
+			<xsd:attribute name="extends" type="xsd:string" use="optional" />
+			<xsd:attribute name="id" type="xsd:ID" use="optional" />
+			<xsd:attribute name="abstract" type="xsd:boolean" use="optional" />
 		</xsd:complexType>
 	</xsd:element>
 
-	<xsd:complexType name="datarow">
+	<xsd:group name="datarow">
 		<xsd:sequence>
-			<xsd:element name="field" maxOccurs="unbounded">
-				<xsd:complexType>
-					<xsd:simpleContent>
-						<xsd:extension base="xsd:string">
-							<xsd:attribute name="name" type="xsd:string" use="required" />
-							<xsd:attribute name="force-array" type="xsd:boolean"
-								default="false" />
-							<xsd:attribute name="eval" type="xsd:boolean"
-								default="false" />
-							<xsd:attribute name="eval-user" type="xsd:boolean"
-								default="false" />
-							<xsd:attribute name="inherit" type="xsd:boolean"
-								default="false" />
-							<xsd:attribute name="novars" type="xsd:boolean"
-								default="false" />
-						</xsd:extension>
-					</xsd:simpleContent>
-				</xsd:complexType>
-			</xsd:element>
-			<xsd:element name="child" type="wb:datarow" minOccurs="0"
-				maxOccurs="unbounded" />
+			<xsd:choice minOccurs="0" maxOccurs="unbounded">
+				<xsd:element name="field">
+					<xsd:complexType>
+						<xsd:simpleContent>
+							<xsd:extension base="xsd:string">
+								<xsd:attribute name="name" type="xsd:string" use="required" />
+								<xsd:attribute name="force-array" type="xsd:boolean"
+									default="false" />
+								<xsd:attribute name="eval" type="xsd:boolean"
+									default="false" />
+								<xsd:attribute name="eval-user" type="xsd:boolean"
+									default="false" />
+								<xsd:attribute name="inherit" type="xsd:boolean"
+									default="false" />
+								<xsd:attribute name="inheritField" type="xsd:string"
+									default="" />
+								<xsd:attribute name="inheritTable" type="xsd:string"
+									default="" />
+								<xsd:attribute name="novars" type="xsd:boolean"
+									default="false" />
+							</xsd:extension>
+						</xsd:simpleContent>
+					</xsd:complexType>
+				</xsd:element>
+				<xsd:element name="child" type="wb:datarow" minOccurs="0"
+					maxOccurs="unbounded" />
+				<xsd:element name="placeholder">
+					<xsd:complexType>
+						<xsd:attribute name="name" type="xsd:string" use="required" />
+					</xsd:complexType>
+				</xsd:element>
+			</xsd:choice>
 		</xsd:sequence>
+	</xsd:group>
+	
+	<xsd:complexType name="datarow">
+		<xsd:group ref="wb:datarow" />
 		<xsd:attribute name="table" type="xsd:string" use="required" />
 		<xsd:attribute name="var" type="xsd:ID" />
 	</xsd:complexType>
@@ -130,7 +156,8 @@
 								<xsd:complexType>
 									<xsd:simpleContent>
 										<xsd:extension base="xsd:string">
-											<xsd:attribute name="value" type="xsd:string" use="required" />
+											<xsd:attribute name="value" type="xsd:string"
+												use="required" />
 										</xsd:extension>
 									</xsd:simpleContent>
 								</xsd:complexType>
@@ -165,8 +192,8 @@
 					<xsd:choice>
 						<xsd:element name="helpwizard" type="xsd:boolean"
 							minOccurs="0" />
-						<xsd:element name="mandatory" type="xsd:boolean" default="true"
-							minOccurs="0" />
+						<xsd:element name="mandatory" type="xsd:boolean"
+							default="true" minOccurs="0" />
 						<xsd:element name="maxlength" type="xsd:positiveInteger"
 							minOccurs="0" />
 						<xsd:element name="minlength" type="xsd:positiveInteger"

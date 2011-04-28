@@ -38,7 +38,7 @@
  */
 class WebsiteBuilderDatasetImport extends BackendModule
 {
-	private static $VAR_REPLACE_REGEXP = '#\$(\w+(?:(?:\.|->)\w+)*|\{([^\}]+)\})#';
+	private static $VAR_REPLACE_REGEXP = '#\$(\w+(?:(?:\.|->)\w+)*(\|\w+)?|\{([^\}\|]+)(\|\w+)?\})#';
 	
 	
 	/**
@@ -53,6 +53,13 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	 * @var array
 	 */
 	protected $arrVariables;
+	
+	
+	/**
+	 * Placeholder data
+	 * @var array
+	 */
+	protected $arrData;
 	
 	
 	/**
@@ -256,6 +263,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			
 			$strName = $xpath->evaluate('string(@name)', $nodeField);
 			$blnInherit = $xpath->evaluate('boolean(@inherit)', $nodeField);
+			$strInheritField = $xpath->evaluate('string(@inheritField)', $nodeField);
+			$strInheritTable = $xpath->evaluate('string(@inheritTable)', $nodeField);
 			$blnEval = $xpath->evaluate('boolean(@eval)', $nodeField);
 			$blnEvalUser = $xpath->evaluate('boolean(@eval-user)', $nodeField);
 			$blnForceArray = $xpath->evaluate('boolean(@force-array)', $nodeField);
@@ -265,6 +274,14 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			// inherit from parent
 			if ($blnInherit)
 			{
+				if (!$strInheritField)
+				{
+					$strInheritField = $strName;
+				}
+				if (!$strInheritTable)
+				{
+					$strInheritTable = $strTable;
+				}
 				if ($varPid)
 				{
 					$strPid = $varPid;
@@ -279,17 +296,17 @@ class WebsiteBuilderDatasetImport extends BackendModule
 							SELECT
 								*
 							FROM
-								$strTable
+								$strInheritTable
 							WHERE
 								id=?")
 						->executeUncached($strPid);
 					if ($objParent->next())
 					{
-						$strValue = $objParent->$strName;
+						$strValue = $objParent->$strInheritField;
 					}
 					else
 					{
-						throw new Exception('Could not inherit "' . $strName . '" from "' . $strTable . '", parent id "' . $strPid . '" was not found!');
+						throw new Exception('Could not inherit "' . $strInheritTable . "." . $strInheritField . '" as "' . $strTable . "." . $strName . '", row id "' . $strPid . '" was not found!');
 					}
 				}
 			}
@@ -444,16 +461,30 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	 */
 	protected function replaceVariable($arrMatches)
 	{
-		if (!empty($arrMatches[2]))
+		if (!empty($arrMatches[3]))
 		{
-			$strKey = $arrMatches[2];
+			$strKey = $arrMatches[3];
 		}
 		else
 		{
 			$strKey = $arrMatches[1];
 		}
 		
+		if (!empty($arrMatches[4]))
+		{
+			$strFunction = substr($arrMatches[4], 1);
+		}
+		elseif (!empty($arrMatches[2]))
+		{
+			$strFunction = substr($arrMatches[2], 1);
+		}
+		else
+		{
+			$strFunction = false;
+		}
+		
 		$arrKeys = preg_split('#\.|->#', $strKey);
+		$varValue = null;
 		
 		if (count($arrKeys) > 1)
 		{
@@ -478,18 +509,58 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					throw new Exception('Variable part "' . $strKey . '" from "' . $strOriginalKey . '" not available.<br/><span style="white-space:pre">' . htmlentities($arrMatches[0]) . '</span><br/><span style="white-space:pre">' . htmlentities(print_r(array_keys($this->arrVariables), true)) . '</span>');
 				}
 			}
-			return is_array($varTmp) ? serialize($varTmp) : $varTmp;
+			$varValue = $varTmp;
 		}
 		else if (isset($this->arrVariables[$strKey]))
 		{
-			return is_array($this->arrVariables[$strKey]) ? serialize($this->arrVariables[$strKey]) : is_object($this->arrVariables[$strKey]) ? $this->arrVariables[$strKey]->id : $this->arrVariables[$strKey];
+			$varValue = $this->arrVariables[$strKey];
 		}
 		else if (isset($GLOBALS['TL_CONFIG'][$strKey]))
 		{
-			return $GLOBALS['TL_CONFIG'][$strKey];
+			$varValue = $GLOBALS['TL_CONFIG'][$strKey];
+		}
+		
+		if ($varValue !== null)
+		{
+			$varValue = $this->applyFunction($strFunction, $varValue);
+			
+			if (is_array($varValue))
+			{
+				return serialize($varValue);
+			}
+			else if (is_object($varValue))
+			{
+				return $varValue->id;
+			}
+			else
+			{
+				return $varValue;
+			}
 		}
 		
 		throw new Exception('Variable "' . $strKey . '" not available.<br/><span style="white-space:pre">' . htmlentities($arrMatches[0]) . '</span><br/><span style="white-space:pre">' . htmlentities(print_r(array_keys($this->arrVariables), true)) . '</span>');
+	}
+	
+	
+	protected function applyFunction($strFunction, $varValue)
+	{
+		if (!$strFunction)
+		{
+			return $varValue;
+		}
+		
+		if (is_array($varValue))
+		{
+			foreach ($varValue as $k=>$v)
+			{
+				$varValue[$k] = $this->applyFunction($strFunction, $v);
+			}
+			return $varValue;
+		}
+		else
+		{
+			return call_user_func($strFunction, $varValue);
+		}
 	}
 	
 	
@@ -617,6 +688,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 						}
 						$arrData['eval']['required'] = $arrData['eval']['mandatory'];
 						
+						// optional values
 						if (!$arrData['eval']['required'])
 						{
 							$arrData['label'][0] .= ' (optional)';
@@ -632,12 +704,19 @@ class WebsiteBuilderDatasetImport extends BackendModule
 						$arrWidget = $this->prepareForWidget($arrData, $strName, '', $strName, 'tl_dataset_import');
 						$objWidget = new $strClass($arrWidget);
 						
+						// default value
+						if ($arrData['default'] && $this->Input->post('FORM_SUBMIT') != 'dataset_import')
+						{
+							$objWidget->value = $arrData['default'];
+						}
+						
 						$arrWidgets[$strName] = $objWidget;
 					}
 					
 					if (	!count($arrWidgets) // no variables
 						||	$this->Input->post('FORM_SUBMIT') == 'dataset_import')
 					{
+						$this->arrData = array();
 						$this->arrVariables = array();
 						$this->arrLateUpdate = array();
 						$this->arrCreated = array();
@@ -660,6 +739,24 @@ class WebsiteBuilderDatasetImport extends BackendModule
 							{
 								$nodeDataset = $doc->documentElement;
 								
+								// replace placeholders
+								$nodesData = $xpath->evaluate('wb:data', $nodeDataset);
+								foreach ($nodesData as $nodeData)
+								{
+									$strPlace = $xpath->evaluate('string(@place)', $nodeData);
+									$nodesPlaceholders = $xpath->evaluate('//wb:placeholder[@name="' . $strPlace . '"]', $nodeDataset);
+									foreach ($nodesPlaceholders as $nodePlaceholder)
+									{
+										$nodeParent = $nodePlaceholder->parentNode;
+										foreach ($nodeData->childNodes as $nodeChild)
+										{
+											$nodeParent->insertBefore($nodeChild->cloneNode(true), $nodePlaceholder);
+										}
+										$nodeParent->removeChild($nodePlaceholder);
+									}
+								}
+								
+								// import rows
 								$nodesRow = $xpath->evaluate('wb:row', $nodeDataset);
 								
 								for ($i=0; $i<$nodesRow->length; $i++)
@@ -828,18 +925,42 @@ class WebsiteBuilderDatasetImport extends BackendModule
 								{
 									$nodeDataset = $nodesDataset->item($i);
 									
-									do
+									$strId = $xpath->evaluate('string(@id)', $nodeDataset);
+									if ($strId)
 									{
-										$strKey = substr(md5(time()*rand()), 0, 8);
+										$strKey = $strId;
 									}
-									while (isset($arrDatasets[$strKey]));
+									else
+									{
+										do
+										{
+											$strKey = substr(md5(time()*rand()), 0, 8);
+										}
+										while (isset($arrDatasets[$strKey]));
+									}
 									
 									$arrDatasets[$strKey] = array(
 										'id'          => $strKey,
-										'name'        => $xpath->evaluate('string(wb:name/text())', $nodeDataset),
-										'description' => $xpath->evaluate('string(wb:description/text())', $nodeDataset),
+										'extends'     => $xpath->evaluate('string(@extends)', $nodeDataset),
+										'abstract'    => $xpath->evaluate('string(@abstract)', $nodeDataset),
 										'xml'         => $doc->saveXML($nodeDataset)
 									);
+								}
+								
+								foreach ($arrDatasets as $strKey=>&$arrDataset)
+								{
+									$this->extendDataset($strKey, $arrDataset, $arrDatasets);
+								}
+								
+								foreach ($arrDatasets as $strKey=>&$arrDataset)
+								{
+									$doc = new DOMDocument();
+									$doc->loadXML($arrDataset['xml']);
+									$xpath = new DOMXPath($doc);
+									$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
+									
+									$arrDataset['name']        = $xpath->evaluate('string(wb:name/text())', $doc->documentElement);
+									$arrDataset['description'] = $xpath->evaluate('string(wb:description/text())', $doc->documentElement);
 								}
 							}
 						}
@@ -862,6 +983,73 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		else
 		{
 			$_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['missing_configuration'];
+		}
+	}
+	
+	
+	/**
+	 * Extend a dataset
+	 */
+	protected function extendDataset($strKey, &$arrDataset, &$arrDatasets)
+	{
+		if ($arrDataset['extends'])
+		{
+			$strExtends = $arrDataset['extends'];
+			if ($arrDatasets[$strExtends])
+			{
+				$this->extendDataset($strExtends, $arrDatasets[$strExtends], $arrDatasets);
+				
+				$doc = new DOMDocument();
+				$nodeDataset = $doc->createElementNS('http://www.infinitysoft.de/contao/website_builder', 'dataset');
+				$doc->appendChild($nodeDataset);
+				
+				$docExtension = new DOMDocument();
+				$docExtension->loadXML($arrDataset['xml']);
+				$xpathExtension = new DOMXPath($docExtension);
+				$xpathExtension->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
+				
+				$docBase = new DOMDocument();
+				$docBase->loadXML($arrDatasets[$strExtends]['xml']);
+				$xpathBase = new DOMXPath($docBase);
+				$xpathBase->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
+				
+				// singleton elements
+				foreach (array('wb:name', 'wb:description') as $strElement)
+				{
+					$nodeElement = $xpathExtension->query($strElement, $docExtension->documentElement);
+					if ($nodeElement->length > 0)
+					{
+						$nodeDataset->appendChild($doc->importNode($nodeElement->item(0), true));
+					}
+					else
+					{
+						$nodeElement = $xpathBase->query($strElement, $docBase->documentElement);
+						if ($nodeElement->length > 0)
+						{
+							$nodeDataset->appendChild($doc->importNode($nodeElement->item(0), true));
+						}
+					}
+				}
+				
+				// append elements
+				foreach (array('wb:variable', 'wb:group', 'wb:data', 'wb:row', 'wb:mkdir', 'wb:mkfile', 'wb:load') as $strElement)
+				{
+					$nodeElements = $xpathExtension->query($strElement, $docExtension->documentElement);
+					foreach ($nodeElements as $nodeElement)
+					{
+						$nodeDataset->appendChild($doc->importNode($nodeElement, true));
+					}
+					
+					$nodeElements = $xpathBase->query($strElement, $docBase->documentElement);
+					foreach ($nodeElements as $nodeElement)
+					{
+						$nodeDataset->appendChild($doc->importNode($nodeElement, true));
+					}
+				}
+				
+				$arrDataset['xml'] = $doc->saveXML();
+			}
+			unset($arrDataset['extends']);
 		}
 	}
 	
