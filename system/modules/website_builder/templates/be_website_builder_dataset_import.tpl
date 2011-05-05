@@ -16,7 +16,7 @@
 <?php
 foreach ($this->variables as $variable):
 	?><div>
-	<h3><?php echo $variable->generateLabel(); ?></h3>
+	<?php if ($variable->type != 'checkbox'): ?><h3><?php echo $variable->generateLabel(); ?></h3><?php endif; ?>
 	<?php echo $variable->generate(); ?>
 	<?php if (!$variable->hasErrors()): ?><p class="tl_help<?php if (!$GLOBALS['TL_CONFIG']['oldBeTheme']): echo ' tl_tip'; endif; ?>"><?php echo $variable->description; ?></p><?php
 	else: ?><p class="tl_error"><?php echo $variable->getErrorAsHTML(); ?></p><?php endif; ?>
@@ -42,7 +42,7 @@ endforeach;
 <?php echo $this->getMessages(); ?>
 
 <ul>
-<?php foreach ($this->datasets as $dataset): ?>
+<?php foreach ($this->datasets as $dataset): if (!$dataset['abstract']): ?>
 	<li>
 		<h3><?php echo $dataset['name']; ?></h3>
 		<?php if ($dataset['description']): ?><p><?php echo $dataset['description']; ?></p><?php endif; ?>
@@ -53,7 +53,7 @@ endforeach;
 			<input type="submit" value="<?php echo specialchars($GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['submit']); ?>" />
 		</form>
 	</li>
-<?php endforeach; ?>
+<?php endif; endforeach; ?>
 </ul>
 
 </div>
