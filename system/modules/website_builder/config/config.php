@@ -44,6 +44,12 @@ $GLOBALS['BE_MOD'] = array_merge(
 				'callback'   => 'WebsiteBuilderDatasetImport',
 				'icon'       => 'system/modules/website_builder/html/dataset_import.png',
 				'stylesheet' => 'system/modules/website_builder/html/stylesheet.css'
+			),
+			'multilang' => array
+			(
+				'callback'   => 'WebsiteBuilderMultilang',
+				'icon'       => 'system/modules/website_builder/html/multilang.png',
+				'stylesheet' => 'system/modules/website_builder/html/stylesheet.css'
 			)
 		)
 	),

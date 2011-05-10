@@ -33,5 +33,6 @@
  */
 $GLOBALS['TL_LANG']['MOD']['website_builder'] = 'Website Builder';
 $GLOBALS['TL_LANG']['MOD']['dataset_import']  = array('Datensätze importieren', '');
+$GLOBALS['TL_LANG']['MOD']['multilang']       = array('Mehrsprachenstruktur', '');
 
 ?>
