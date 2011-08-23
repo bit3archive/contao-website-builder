@@ -32,6 +32,7 @@
  * Back end modules
  */
 $GLOBALS['TL_LANG']['MOD']['website_builder'] = 'Website Builder';
-$GLOBALS['TL_LANG']['MOD']['dataset_import']  = 'Import datasets';
+$GLOBALS['TL_LANG']['MOD']['dataset_import']  = array('Import datasets', '');
+$GLOBALS['TL_LANG']['MOD']['multilang']       = array('Multi language structures', '');
 
 ?>

@@ -39,43 +39,43 @@
 class WebsiteBuilderDatasetImport extends BackendModule
 {
 	private static $VAR_REPLACE_REGEXP = '#\$(\w+(?:(?:\.|->)\w+)*(\|\w+)?|\{([^\}\|]+)(\|\w+)?\})#';
-	
-	
+
+
 	/**
 	 * Template
 	 * @var string
 	 */
 	protected $strTemplate = 'be_website_builder_dataset_import';
-	
-	
+
+
 	/**
 	 * The local variables
 	 * @var array
 	 */
 	protected $arrVariables;
-	
-	
+
+
 	/**
 	 * Placeholder data
 	 * @var array
 	 */
 	protected $arrData;
-	
-	
+
+
 	/**
 	 * Information about "late update" fields, stored as reference of table => field => value
 	 * @var array
 	 */
 	protected $arrLateUpdate;
-	
-	
+
+
 	/**
 	 * List of all created elements ids to roll back the import.
 	 * @var array
 	 */
 	protected $arrCreated;
-	
-	
+
+
 	/**
 	 * Initialise the backend module.
 	 */
@@ -84,11 +84,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		parent::__construct();
 		$this->import('BackendUser', 'User');
 	}
-	
-	
+
+
 	/**
 	 * Convert a callback node into a php callback.
-	 * 
+	 *
 	 * @param DOMNode $domNodeCallback
 	 * @param DOMXPath $xpath
 	 * @return array
@@ -99,11 +99,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		$strMethod = $xpath->evaluate('string(@method)');
 		return array($strClass, $strMethod);
 	}
-	
-	
+
+
 	/**
 	 * Convert a node set into a widget compatible dca structure.
-	 * 
+	 *
 	 * @param DOMNode $domNode
 	 * @param DOMXPath $xpath
 	 * @return array
@@ -111,18 +111,18 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	protected function convertXML2Widget(DOMNode $domNode, DOMXPath &$xpath)
 	{
 		$arrData = array();
-		
+
 		for ($i=0; $i<$domNode->childNodes->length; $i++)
 		{
 			$nodeChild = $domNode->childNodes->item($i);
 			$strName = $nodeChild->localName;
-			
+
 			/* script text elements */
 			if (empty($strName))
 			{
 				continue;
 			}
-			
+
 			switch ($strName)
 			{
 			/* the label */
@@ -133,7 +133,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 				$arrData['label'][0] = $nodeChild->textContent;
 				break;
-			
+
 			/* the description part of the label */
 			case 'description':
 				if (!isset($arrData['label']))
@@ -142,7 +142,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 				$arrData['label'][1] = $nodeChild->textContent;
 				break;
-			
+
 			/* convert options to an array */
 			case 'options':
 				$arrOptions = array();
@@ -156,7 +156,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 				$arrData['options'] = $arrOptions;
 				break;
-			
+
 			/* convert references to a hash map */
 			case 'reference':
 				$arrRefs = array();
@@ -170,18 +170,18 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 				$arrData['reference'] = $arrRefs;
 				break;
-				
+
 			/* callback fields */
 			case 'options_callback';
 			case 'inputFieldCallback':
 				$arrData[$strName] = $this->convertCallback($nodeChild, $xpath);
 				break;
-			
+
 			/* eval is a subset, also convert it to an array */
 			case 'eval':
 				$arrData['eval'] = $this->convertXML2Widget($nodeChild, $xpath);
 				break;
-			
+
 			/* boolean fields */
 			case 'helpwizard':
 			case 'mandatory':
@@ -204,7 +204,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			case 'findInSet':
 				$arrData[$strName] = (trim($nodeChild->textContent) == 'true');
 				break;
-			
+
 			/* a simple text containing field */
 			default:
 				$arrData[$strName] = $nodeChild->textContent;
@@ -212,11 +212,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		}
 		return $arrData;
 	}
-	
-	
+
+
 	/**
 	 * Import datarows into the database.
-	 * 
+	 *
 	 * @param DOMNode $domNode
 	 * @param DOMXPath $xpath
 	 * @param mixed $varPid
@@ -226,15 +226,15 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	{
 		$strVar = $xpath->evaluate('string(@var)', $domNode);
 		$strTable = $xpath->evaluate('string(@table)', $domNode);
-		
+
 		$objConnector = new libContaoConnector($strTable, 'id', '0');
-		
+
 		// overwrite id=0 with insert id
 		$objConnector->__colAlias = $objConnector->id;
-		
+
 		// store as created row
 		$this->arrCreated[$strTable][] = $objConnector->id;
-		
+
 		// load default values
 		$this->loadDataContainer($strTable);
 		if (is_array($GLOBALS['TL_DCA'][$strTable]['fields']))
@@ -247,20 +247,20 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 			}
 		}
-		
+
 		if ($varPid)
 		{
 			$objConnector->pid = $varPid;
 		}
-		
+
 		$arrLateUpdate = array();
-		
+
 		// fill the data fields
 		$nodesField = $xpath->query('wb:field', $domNode);
 		for ($i=0; $i<$nodesField->length; $i++)
 		{
 			$nodeField = $nodesField->item($i);
-			
+
 			$strName = $xpath->evaluate('string(@name)', $nodeField);
 			$blnInherit = $xpath->evaluate('boolean(@inherit)', $nodeField);
 			$strInheritField = $xpath->evaluate('string(@inheritField)', $nodeField);
@@ -270,7 +270,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			$blnForceArray = $xpath->evaluate('boolean(@force-array)', $nodeField);
 			$blnNovars = $xpath->evaluate('boolean(@novars)', $nodeField);
 			$strValue = $nodeField->textContent;
-			
+
 			// inherit from parent
 			if ($blnInherit)
 			{
@@ -310,7 +310,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					}
 				}
 			}
-			
+
 			// replace all variables
 			if (!$blnNovars)
 			{
@@ -331,7 +331,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					continue;
 				}
 			}
-			
+
 			// evaluate as php code
 			if ($blnEval)
 			{
@@ -346,7 +346,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					unset($varEvaluatedValue);
 				}
 			}
-			
+
 			// evaluate as user assigning php code
 			if ($blnEvalUser)
 			{
@@ -366,20 +366,20 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					unset($varEvaluatedValue);
 				}
 			}
-			
+
 			// force build of an array
 			if ($blnForceArray && !is_array($strValue))
 			{
 				$strValue = array($strValue);
 			}
-			
+
 			$objConnector->$strName = $strValue;
 		}
-		
+
 		if ($this->Database->fieldExists('alias', $strTable) && empty($objConnector->alias))
 		{
 			$strAlias = standardize(trim(empty($objConnector->name) ? $objConnector->title : $objConnector->name));
-			
+
 			if ($strAlias)
 			{
 				$objAlias = $this->Database->prepare("
@@ -394,7 +394,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				{
 					$strAlias .= '.' . $objConnector->id;
 				}
-				
+
 				$objConnector->alias = $strAlias;
 			}
 		}
@@ -423,16 +423,16 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			}
 			$objConnector->sorting = ($objSorting->sorting > 0 ? $objSorting->sorting : 0) + 128;
 		}
-		
+
 		// store the data
 		$objConnector->Sync();
-		
+
 		// set the local var
 		if ($strVar)
 		{
 			$this->arrVariables[$strVar] = $objConnector;
 		}
-		
+
 		// add late update variables
 		if (count($arrLateUpdate))
 		{
@@ -442,7 +442,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			}
 			$this->arrLateUpdate[$strTable][$objConnector->id] = $arrLateUpdate;
 		}
-		
+
 		// import the child records
 		$nodesChild = $xpath->query('wb:child', $domNode);
 		for ($i=0; $i<$nodesChild->length; $i++)
@@ -450,11 +450,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			$this->importDatarow($nodesChild->item($i), $xpath, $objConnector->id);
 		}
 	}
-	
-	
+
+
 	/**
 	 * Callback method for preg_replace_callback to replace variables.
-	 * 
+	 *
 	 * @param array $arrMatches
 	 * @return string
 	 * @throws Exception
@@ -469,7 +469,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		{
 			$strKey = $arrMatches[1];
 		}
-		
+
 		if (!empty($arrMatches[4]))
 		{
 			$strFunction = substr($arrMatches[4], 1);
@@ -482,10 +482,10 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		{
 			$strFunction = false;
 		}
-		
+
 		$arrKeys = preg_split('#\.|->#', $strKey);
 		$varValue = null;
-		
+
 		if (count($arrKeys) > 1)
 		{
 			$strOriginalKey = $strKey;
@@ -519,11 +519,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		{
 			$varValue = $GLOBALS['TL_CONFIG'][$strKey];
 		}
-		
+
 		if ($varValue !== null)
 		{
 			$varValue = $this->applyFunction($strFunction, $varValue);
-			
+
 			if (is_array($varValue))
 			{
 				return serialize($varValue);
@@ -537,18 +537,18 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				return $varValue;
 			}
 		}
-		
+
 		throw new Exception('Variable "' . $strKey . '" not available.<br/><span style="white-space:pre">' . htmlentities($arrMatches[0]) . '</span><br/><span style="white-space:pre">' . htmlentities(print_r(array_keys($this->arrVariables), true)) . '</span>');
 	}
-	
-	
+
+
 	protected function applyFunction($strFunction, $varValue)
 	{
 		if (!$strFunction)
 		{
 			return $varValue;
 		}
-		
+
 		if (is_array($varValue))
 		{
 			foreach ($varValue as $k=>$v)
@@ -562,8 +562,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			return call_user_func($strFunction, $varValue);
 		}
 	}
-	
-	
+
+
 	/**
 	 * Generate the virtual dca structure.
 	 */
@@ -573,10 +573,10 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		for ($i=0; $i<$nodesVariable->length; $i++)
 		{
 			$nodeVariable = $nodesVariable->item($i);
-			
+
 			$strName = $xpath->evaluate('string(@name)', $nodeVariable);
 			$arrData = $this->convertXML2Widget($nodeVariable, $xpath);
-			
+
 			// default inputType
 			if (empty($arrData['inputType']))
 			{
@@ -587,20 +587,20 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				$arrData['eval']['mandatory'] = true;
 			}
 			$arrData['eval']['required'] = $arrData['eval']['mandatory'];
-			
+
 			$strClass = $GLOBALS['BE_FFL'][$arrData['inputType']];
 			if (!$strClass)
 			{
 				$_SESSION['TL_ERROR'][] = 'Unknown input type: "' . $strClass . '" given for field "' . $strName . '"!';
 				$this->redirect('contao/main.php?do=dataset_import');
 			}
-			
+
 			// fill the virtual dca
 			$GLOBALS['TL_DCA']['tl_dataset_import']['fields'][$strName] = $arrData;
 		}
 	}
-	
-	
+
+
 	/**
 	 * Generate the virtual dca structure.
 	 */
@@ -614,23 +614,23 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			{
 				$doc = new DOMDocument();
 				$doc->loadXML($arrDataset['xml']);
-				
+
 				// only accept valid xml
 				if ($doc->schemaValidate(TL_ROOT . '/system/modules/website_builder/config/website_builder.xsd'))
 				{
 					$xpath = new DOMXPath($doc);
 					$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
-				
+
 					$this->generateDCAFrom($doc, $xpath);
 				}
 			}
 		}
 	}
-	
-	
+
+
 	/**
 	 * Create directory path.
-	 * 
+	 *
 	 * @param string $strPath
 	 */
 	protected function mkdirs($strPath)
@@ -641,15 +641,15 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			mkdir($strPath);
 		}
 	}
-	
-	
+
+
 	/**
 	 * Generate module
 	 */
 	protected function compile()
 	{
 		$this->loadLanguageFile('tl_website_builder_dataset_import');
-		
+
 		if (strlen($this->Input->get('dataset')))
 		{
 			$arrDatasets = deserialize($this->Session->get('datasets'));
@@ -658,25 +658,25 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			{
 				$doc = new DOMDocument();
 				$doc->loadXML($arrDataset['xml']);
-				
+
 				// only accept valid xml
 				if ($doc->schemaValidate(TL_ROOT . '/system/modules/website_builder/config/website_builder.xsd'))
 				{
 					$xpath = new DOMXPath($doc);
 					$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
-					
+
 					$this->generateDCAFrom($doc, $xpath);
-					
+
 					$arrWidgets = array();
-					
+
 					$nodesVariable = $xpath->query('wb:variable');
 					for ($i=0; $i<$nodesVariable->length; $i++)
 					{
 						$nodeVariable = $nodesVariable->item($i);
-						
+
 						$strName = $xpath->evaluate('string(@name)', $nodeVariable);
 						$arrData = $this->convertXML2Widget($nodeVariable, $xpath);
-						
+
 						// default inputType
 						if (empty($arrData['inputType']))
 						{
@@ -687,32 +687,32 @@ class WebsiteBuilderDatasetImport extends BackendModule
 							$arrData['eval']['mandatory'] = true;
 						}
 						$arrData['eval']['required'] = $arrData['eval']['mandatory'];
-						
+
 						// optional values
 						if (!$arrData['eval']['required'])
 						{
 							$arrData['label'][0] .= ' (optional)';
 						}
-						
+
 						$strClass = $GLOBALS['BE_FFL'][$arrData['inputType']];
 						if (!$strClass)
 						{
 							$_SESSION['TL_ERROR'][] = 'Unknown input type: "' . $strClass . '" given for field "' . $strName . '"!';
 							$this->redirect('contao/main.php?do=dataset_import');
 						}
-						
+
 						$arrWidget = $this->prepareForWidget($arrData, $strName, '', $strName, 'tl_dataset_import');
 						$objWidget = new $strClass($arrWidget);
-						
+
 						// default value
 						if ($arrData['default'] && $this->Input->post('FORM_SUBMIT') != 'dataset_import')
 						{
 							$objWidget->value = $arrData['default'];
 						}
-						
+
 						$arrWidgets[$strName] = $objWidget;
 					}
-					
+
 					if (	!count($arrWidgets) // no variables
 						||	$this->Input->post('FORM_SUBMIT') == 'dataset_import')
 					{
@@ -720,7 +720,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 						$this->arrVariables = array();
 						$this->arrLateUpdate = array();
 						$this->arrCreated = array();
-						
+
 						$blnDoNotSubmit = false;
 						foreach ($arrWidgets as $strName => $objWidget)
 						{
@@ -731,14 +731,14 @@ class WebsiteBuilderDatasetImport extends BackendModule
 								$blnDoNotSubmit = true;
 							}
 						}
-						
+
 						// the final import
 						if (!$blnDoNotSubmit)
 						{
 							try
 							{
 								$nodeDataset = $doc->documentElement;
-								
+
 								// replace placeholders
 								$nodesData = $xpath->evaluate('wb:data', $nodeDataset);
 								foreach ($nodesData as $nodeData)
@@ -755,15 +755,15 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										$nodeParent->removeChild($nodePlaceholder);
 									}
 								}
-								
+
 								// import rows
 								$nodesRow = $xpath->evaluate('wb:row', $nodeDataset);
-								
+
 								for ($i=0; $i<$nodesRow->length; $i++)
 								{
 									$this->importDatarow($nodesRow->item($i), $xpath);
 								}
-								
+
 								foreach ($this->arrLateUpdate as $strTable => $arrTable)
 								{
 									foreach ($arrTable as $strId => $arrLateUpdate)
@@ -773,7 +773,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										{
 											// no try-catch here, because if variable is not available here, i can not fallback!
 											$strValue = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $arrValue['value']);
-											
+
 											if ($arrValue['eval'])
 											{
 												if (false === eval('$strEvaluatedValue = '.$strValue.';'))
@@ -785,12 +785,12 @@ class WebsiteBuilderDatasetImport extends BackendModule
 													$strValue = $strEvaluatedValue;
 												}
 											}
-											
+
 											if ($arrValue['forceArray'] && !is_array($strValue))
 											{
 												$strValue = array($strValue);
 											}
-											
+
 											$objConnector->$strName = $strValue;
 										}
 										// store the data
@@ -799,7 +799,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										unset($objConnector);
 									}
 								}
-								
+
 								$nodesMkdir = $xpath->evaluate('wb:mkdir', $nodeDataset);
 								for ($i=0; $i<$nodesMkdir->length; $i++)
 								{
@@ -808,7 +808,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 									// create the directory
 									$this->mkdirs(TL_ROOT . '/' . $strPath);
 								}
-								
+
 								$nodesMkfile = $xpath->evaluate('wb:mkfile', $nodeDataset);
 								for ($i=0; $i<$nodesMkfile->length; $i++)
 								{
@@ -819,7 +819,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 									// create the file
 									file_put_contents(TL_ROOT . '/' . $strPath, "");
 								}
-								
+
 								$nodesLoad = $xpath->evaluate('wb:load', $nodeDataset);
 								for ($i=0; $i<$nodesLoad->length; $i++)
 								{
@@ -827,7 +827,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 									$strTarget = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $xpath->evaluate('string(@target)', $nodeLoad));
 									$blnUnzip = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $xpath->evaluate('boolean(@unzip)', $nodeLoad));
 									$strSource = preg_replace_callback(self::$VAR_REPLACE_REGEXP, array(&$this, 'replaceVariable'), $nodeLoad->textContent);
-									
+
 									$strName = basename($strSource);
 									// absolutize source
 									if (!(	preg_match('#^https?://#', $strSource)
@@ -835,12 +835,12 @@ class WebsiteBuilderDatasetImport extends BackendModule
 									{
 										$strSource = TL_ROOT . '/' . $strSource;
 									}
-									
+
 									if (false === @copy($strSource, TL_ROOT . '/' . $strTarget . '/' . $strName))
 									{
 										throw new Exception('Copy "' . $strSource . '" to "' . $strTarget . '/' . $strName . '" failed!');
 									}
-									
+
 									if ($blnUnzip)
 									{
 										$zipReader = new ZipReader($strTarget . '/' . $strName);
@@ -853,7 +853,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										@unlink(TL_ROOT . '/' . $strTarget . '/' . $strName);
 									}
 								}
-								
+
 								$this->log(preg_replace('#</?strong>#', '"', $_SESSION['TL_INFO'][] = sprintf($GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['success'], $xpath->evaluate('string(wb:name/text())', $nodeDataset))), 'WebsiteBuilderDatasetImport compile()', TL_INFO);
 								$this->redirect('contao/main.php?do=dataset_import');
 							}
@@ -871,24 +871,24 @@ class WebsiteBuilderDatasetImport extends BackendModule
 							}
 						}
 					}
-					
+
 					$this->Template->variables = $arrWidgets;
 					return;
 				}
 			}
 			$this->redirect('contao/main.php?do=dataset_import');
 		}
-		
+
 		// no operation, list importable datasets
 		$GLOBALS['TL_CONFIG']['website_builder_datasets'] = deserialize($GLOBALS['TL_CONFIG']['website_builder_datasets'], true);
 		if (is_array($GLOBALS['TL_CONFIG']['website_builder_datasets']) && count($GLOBALS['TL_CONFIG']['website_builder_datasets']))
 		{
 			$arrDatasets = array();
-			
+
 			for ($n=0; $n<count($GLOBALS['TL_CONFIG']['website_builder_datasets']); $n++)
 			{
 				$strDataset = $GLOBALS['TL_CONFIG']['website_builder_datasets'][$n];
-				
+
 				if (	preg_match('#^https?://#', $strDataset)
 					||	preg_match('#^/#', $strDataset)
 					||	file_exists($strDataset = TL_ROOT . '/' . $strDataset))
@@ -906,7 +906,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 							{
 								$xpath = new DOMXPath($doc);
 								$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
-								
+
 								$nodesImport = $xpath->query('//wb:import');
 								for ($i=0; $i<$nodesImport->length; $i++)
 								{
@@ -919,12 +919,12 @@ class WebsiteBuilderDatasetImport extends BackendModule
 									}
 									$GLOBALS['TL_CONFIG']['website_builder_datasets'][] = $strImport;
 								}
-								
+
 								$nodesDataset = $xpath->query('//wb:dataset');
 								for ($i=0; $i<$nodesDataset->length; $i++)
 								{
 									$nodeDataset = $nodesDataset->item($i);
-									
+
 									$strId = $xpath->evaluate('string(@id)', $nodeDataset);
 									if ($strId)
 									{
@@ -938,7 +938,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										}
 										while (isset($arrDatasets[$strKey]));
 									}
-									
+
 									$arrDatasets[$strKey] = array(
 										'id'          => $strKey,
 										'extends'     => $xpath->evaluate('string(@extends)', $nodeDataset),
@@ -946,19 +946,19 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										'xml'         => $doc->saveXML($nodeDataset)
 									);
 								}
-								
+
 								foreach ($arrDatasets as $strKey=>&$arrDataset)
 								{
 									$this->extendDataset($strKey, $arrDataset, $arrDatasets);
 								}
-								
+
 								foreach ($arrDatasets as $strKey=>&$arrDataset)
 								{
 									$doc = new DOMDocument();
 									$doc->loadXML($arrDataset['xml']);
 									$xpath = new DOMXPath($doc);
 									$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
-									
+
 									$arrDataset['name']        = $xpath->evaluate('string(wb:name/text())', $doc->documentElement);
 									$arrDataset['description'] = $xpath->evaluate('string(wb:description/text())', $doc->documentElement);
 								}
@@ -967,7 +967,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					}
 				}
 			}
-			
+
 			if (count($arrDatasets))
 			{
 				$this->Session->set('datasets', serialize($arrDatasets));
@@ -978,15 +978,15 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				$_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['faulty_configuration'];
 			}
 		}
-		
+
 		// no datasets configured
 		else
 		{
 			$_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['missing_configuration'];
 		}
 	}
-	
-	
+
+
 	/**
 	 * Extend a dataset
 	 */
@@ -998,21 +998,21 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			if ($arrDatasets[$strExtends])
 			{
 				$this->extendDataset($strExtends, $arrDatasets[$strExtends], $arrDatasets);
-				
+
 				$doc = new DOMDocument();
 				$nodeDataset = $doc->createElementNS('http://www.infinitysoft.de/contao/website_builder', 'dataset');
 				$doc->appendChild($nodeDataset);
-				
+
 				$docExtension = new DOMDocument();
 				$docExtension->loadXML($arrDataset['xml']);
 				$xpathExtension = new DOMXPath($docExtension);
 				$xpathExtension->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
-				
+
 				$docBase = new DOMDocument();
 				$docBase->loadXML($arrDatasets[$strExtends]['xml']);
 				$xpathBase = new DOMXPath($docBase);
 				$xpathBase->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
-				
+
 				// singleton elements
 				foreach (array('wb:name', 'wb:description') as $strElement)
 				{
@@ -1030,7 +1030,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 						}
 					}
 				}
-				
+
 				// append elements
 				foreach (array('wb:variable', 'wb:group', 'wb:data', 'wb:row', 'wb:mkdir', 'wb:mkfile', 'wb:load') as $strElement)
 				{
@@ -1039,27 +1039,27 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					{
 						$nodeDataset->appendChild($doc->importNode($nodeElement, true));
 					}
-					
+
 					$nodeElements = $xpathBase->query($strElement, $docBase->documentElement);
 					foreach ($nodeElements as $nodeElement)
 					{
 						$nodeDataset->appendChild($doc->importNode($nodeElement, true));
 					}
 				}
-				
+
 				$arrDataset['xml'] = $doc->saveXML();
 			}
 			unset($arrDataset['extends']);
 		}
 	}
-	
-	
+
+
 	/**
 	 * HOOK to create the virtual dca.
-	 * 
+	 *
 	 * @param string $strName
 	 */
-	public function loadDataContainer($strName)
+	public function hookLoadDataContainer($strName)
 	{
 		if ($strName == 'tl_dataset_import')
 		{

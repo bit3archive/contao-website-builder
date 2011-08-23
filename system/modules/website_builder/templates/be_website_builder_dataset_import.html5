@@ -11,6 +11,7 @@
 
 <form action="contao/main.php?do=dataset_import&dataset=<?php echo specialchars($this->Input->get('dataset')); ?>" method="post">
 <input type="hidden" name="FORM_SUBMIT" value="dataset_import">
+<input type="hidden" name="REQUEST_TOKEN" value="<?php echo REQUEST_TOKEN; ?>">
 <div class="tl_formbody_edit">
 <fieldset id="pal_variables" class="tl_box block">
 <?php
