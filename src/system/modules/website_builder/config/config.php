@@ -61,5 +61,3 @@ $GLOBALS['BE_MOD'] = array_merge(
  * HOOKs
  */
 $GLOBALS['TL_HOOKS']['loadDataContainer'][] = array('WebsiteBuilderDatasetImport', 'hookLoadDataContainer');
-
-?>

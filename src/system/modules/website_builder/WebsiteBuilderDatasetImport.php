@@ -224,16 +224,25 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	 */
 	protected function importDatarow(DOMNode $domNode, DOMXPath &$xpath, $varPid = false)
 	{
-		$strVar = $xpath->evaluate('string(@var)', $domNode);
+        $objDatabase = Database::getInstance();
+
+        /** @var string $strVar */
+        $strVar = $xpath->evaluate('string(@var)', $domNode);
 		$strTable = $xpath->evaluate('string(@table)', $domNode);
 
-		$objConnector = new libContaoConnector($strTable, 'id', '0');
+        // add new row to database
+        $insertId = $objDatabase
+            ->query("INSERT INTO {$strTable} (id) VALUES (NULL)")
+            ->insertId;
 
-		// overwrite id=0 with insert id
-		$objConnector->__colAlias = $objConnector->id;
+        // read new record object
+        $objRecord = (object) $objDatabase
+            ->prepeare("SELECT * FROM {$strTable} WHERE id=?")
+            ->execute($insertId)
+            ->fetchAssoc();
 
 		// store as created row
-		$this->arrCreated[$strTable][] = $objConnector->id;
+		$this->arrCreated[$strTable][] = $objRecord->id;
 
 		// load default values
 		$this->loadDataContainer($strTable);
@@ -243,14 +252,14 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			{
 				if (isset($arrField['default']))
 				{
-					$objConnector->$strName = $arrField['default'];
+					$objRecord->$strName = $arrField['default'];
 				}
 			}
 		}
 
 		if ($varPid)
 		{
-			$objConnector->pid = $varPid;
+			$objRecord->pid = $varPid;
 		}
 
 		$arrLateUpdate = array();
@@ -288,11 +297,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				}
 				else
 				{
-					$strPid = $objConnector->pid;
+					$strPid = $objRecord->pid;
 				}
 				if (strlen($strPid))
 				{
-					$objParent = $this->Database->prepare("
+					$objParent = $objDatabase->prepare("
 							SELECT
 								*
 							FROM
@@ -335,7 +344,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			// evaluate as php code
 			if ($blnEval)
 			{
-				if (false === eval('$varEvaluatedValue = '.$strValue.';'))
+				if (false === ($varEvaluatedValue = eval('return '.$strValue.';')))
 				{
 					unset($varEvaluatedValue);
 					throw new Exception('Evaluation of value "' . htmlentities($strValue) . '" failed for field "' . $strName . '"!');
@@ -373,16 +382,16 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				$strValue = array($strValue);
 			}
 
-			$objConnector->$strName = $strValue;
+			$objRecord->$strName = $strValue;
 		}
 
-		if ($this->Database->fieldExists('alias', $strTable) && empty($objConnector->alias))
+		if ($objDatabase->fieldExists('alias', $strTable) && empty($objRecord->alias))
 		{
-			$strAlias = standardize(trim(empty($objConnector->name) ? $objConnector->title : $objConnector->name));
+			$strAlias = standardize(trim(empty($objRecord->name) ? $objRecord->title : $objRecord->name));
 
 			if ($strAlias)
 			{
-				$objAlias = $this->Database->prepare("
+				$objAlias = $objDatabase->prepare("
 						SELECT
 							*
 						FROM
@@ -392,45 +401,48 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					->executeUncached($strAlias);
 				if ($objAlias->numRows > 0)
 				{
-					$strAlias .= '.' . $objConnector->id;
+					$strAlias .= '.' . $objRecord->id;
 				}
 
-				$objConnector->alias = $strAlias;
+				$objRecord->alias = $strAlias;
 			}
 		}
 
 		// resorting the rows
-		if ($this->Database->fieldExists('sorting', $strTable))
+		if ($objDatabase->fieldExists('sorting', $strTable))
 		{
-			if ($this->Database->fieldExists('pid', $strTable))
+			if ($objDatabase->fieldExists('pid', $strTable))
 			{
-				$objSorting = $this->Database->prepare("
+				$objSorting = $objDatabase->prepare("
 						SELECT
 							MAX(sorting) as sorting
 						FROM
 							$strTable
 						WHERE
 							pid=?")
-					->executeUncached($objConnector->pid);
+					->executeUncached($objRecord->pid);
 			}
 			else
 			{
-				$objSorting = $this->Database->executeUncached("
+				$objSorting = $objDatabase->executeUncached("
 						SELECT
 							MAX(sorting) as sorting
 						FROM
 							$strTable");
 			}
-			$objConnector->sorting = ($objSorting->sorting > 0 ? $objSorting->sorting : 0) + 128;
+			$objRecord->sorting = ($objSorting->sorting > 0 ? $objSorting->sorting : 0) + 128;
 		}
 
-		// store the data
-		$objConnector->Sync();
+		// store the new data
+        $objDatabase
+            ->prepare("UPDATE {$strTable} %s WHERE id=?")
+            ->set($objRecord)
+            ->execute($objRecord->id);
 
 		// set the local var
 		if ($strVar)
 		{
-			$this->arrVariables[$strVar] = $objConnector;
+			$this->arrVariables[$strVar] = $objRecord;
 		}
 
 		// add late update variables
@@ -440,14 +452,14 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			{
 				$this->arrLateUpdate[$strTable] = array();
 			}
-			$this->arrLateUpdate[$strTable][$objConnector->id] = $arrLateUpdate;
+			$this->arrLateUpdate[$strTable][$objRecord->id] = $arrLateUpdate;
 		}
 
 		// import the child records
 		$nodesChild = $xpath->query('wb:child', $domNode);
 		for ($i=0; $i<$nodesChild->length; $i++)
 		{
-			$this->importDatarow($nodesChild->item($i), $xpath, $objConnector->id);
+			$this->importDatarow($nodesChild->item($i), $xpath, $objRecord->id);
 		}
 	}
 
@@ -648,6 +660,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	 */
 	protected function compile()
 	{
+        $objDatabase = Database::getInstance();
+
 		$this->loadLanguageFile('tl_website_builder_dataset_import');
 
 		if (strlen($this->Input->get('dataset')))
@@ -768,7 +782,12 @@ class WebsiteBuilderDatasetImport extends BackendModule
 								{
 									foreach ($arrTable as $strId => $arrLateUpdate)
 									{
-										$objConnector = new libContaoConnector($strTable, 'id', $strId);
+                                        // read current record
+                                        $objRecord = (object) $objDatabase
+                                            ->prepare("SELECT * FROM {$strTable} WHERE id=?")
+                                            ->execute($strId)
+                                            ->fetchAssoc();
+
 										foreach ($arrLateUpdate as $strName => $arrValue)
 										{
 											// no try-catch here, because if variable is not available here, i can not fallback!
@@ -776,7 +795,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 
 											if ($arrValue['eval'])
 											{
-												if (false === eval('$strEvaluatedValue = '.$strValue.';'))
+												if (false === ($strEvaluatedValue = eval('return '.$strValue.';')))
 												{
 													throw new Exception('Evaluation of value "' . htmlentities($strValue) . '" failed for field "' . $strName . '"!');
 												}
@@ -791,10 +810,15 @@ class WebsiteBuilderDatasetImport extends BackendModule
 												$strValue = array($strValue);
 											}
 
-											$objConnector->$strName = $strValue;
+											$objRecord->$strName = $strValue;
 										}
-										// store the data
-										$objConnector->Sync();
+
+                                        // store the updated data
+                                        $objDatabase
+                                            ->prepare("UPDATE {$strTable} %s WHERE id=?")
+                                            ->set($objRecord)
+                                            ->execute($objRecord->id);
+
 										// and destroy connector
 										unset($objConnector);
 									}
@@ -864,7 +888,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 								{
 									if (count($arrIds))
 									{
-										$this->Database->executeUncached("DELETE FROM $strTable WHERE id IN (" . implode(',', $arrIds) . ")");
+										$objDatabase->executeUncached("DELETE FROM $strTable WHERE id IN (" . implode(',', $arrIds) . ")");
 									}
 								}
 								$_SESSION['TL_ERROR'][] = $e->getMessage();

@@ -59,5 +59,3 @@ $GLOBALS['TL_DCA']['tl_dataset_import'] = array
 		
 	)
 );
-
-?>

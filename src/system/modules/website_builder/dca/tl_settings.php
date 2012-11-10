@@ -41,5 +41,3 @@ $GLOBALS['TL_DCA']['tl_settings']['fields']['website_builder_datasets'] = array
 	'inputType'               => 'listWizard',
 	'eval'                    => array('allowHtml'=>true)
 );
-
-?>
