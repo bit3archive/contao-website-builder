@@ -50,7 +50,6 @@ endforeach;
 		<form action="contao/main.php" method="get">
 			<input type="hidden" name="do" value="dataset_import" />
 			<input type="hidden" name="dataset" value="<?php echo specialchars($dataset['id']); ?>" />
-			<input type="hidden" name="table" value="tl_dataset_import" />
 			<input type="submit" value="<?php echo specialchars($GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['submit']); ?>" />
 		</form>
 	</li>

@@ -230,6 +230,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
         $strVar = $xpath->evaluate('string(@var)', $domNode);
 		$strTable = $xpath->evaluate('string(@table)', $domNode);
 
+        // break if table does not exists
+        if (!$objDatabase->tableExists($strTable)) {
+            throw new Exception('Table "' . $strTable . '" does not exists!');
+        }
+
         // add new row to database
         $insertId = $objDatabase
             ->query("INSERT INTO {$strTable} (id) VALUES (NULL)")
@@ -237,9 +242,12 @@ class WebsiteBuilderDatasetImport extends BackendModule
 
         // read new record object
         $objRecord = (object) $objDatabase
-            ->prepeare("SELECT * FROM {$strTable} WHERE id=?")
+            ->prepare("SELECT * FROM {$strTable} WHERE id=?")
             ->execute($insertId)
             ->fetchAssoc();
+
+        // set tstamp
+        $objRecord->tstamp = time();
 
 		// store as created row
 		$this->arrCreated[$strTable][] = $objRecord->id;
@@ -257,11 +265,13 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			}
 		}
 
+        // set the records pid
 		if ($varPid)
 		{
 			$objRecord->pid = $varPid;
 		}
 
+        // collection of records that should be updated lately
 		$arrLateUpdate = array();
 
 		// fill the data fields
@@ -271,6 +281,13 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			$nodeField = $nodesField->item($i);
 
 			$strName = $xpath->evaluate('string(@name)', $nodeField);
+
+            // continue if field does not exists
+            if (!$objDatabase->fieldExists($strName, $strTable)) {
+                $_SESSION['TL_ERROR'][] = 'Field "' . $strTable . '.' . $strName . '" does not exists, skip field!';
+                continue;
+            }
+
 			$blnInherit = $xpath->evaluate('boolean(@inherit)', $nodeField);
 			$strInheritField = $xpath->evaluate('string(@inheritField)', $nodeField);
 			$strInheritTable = $xpath->evaluate('string(@inheritTable)', $nodeField);
@@ -436,7 +453,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 		// store the new data
         $objDatabase
             ->prepare("UPDATE {$strTable} %s WHERE id=?")
-            ->set($objRecord)
+            ->set((array) $objRecord)
             ->execute($objRecord->id);
 
 		// set the local var
@@ -579,43 +596,6 @@ class WebsiteBuilderDatasetImport extends BackendModule
 	/**
 	 * Generate the virtual dca structure.
 	 */
-	protected function generateDCAFrom(DOMDocument $doc, DOMXPath $xpath)
-	{
-		$nodesVariable = $xpath->query('wb:variable');
-		for ($i=0; $i<$nodesVariable->length; $i++)
-		{
-			$nodeVariable = $nodesVariable->item($i);
-
-			$strName = $xpath->evaluate('string(@name)', $nodeVariable);
-			$arrData = $this->convertXML2Widget($nodeVariable, $xpath);
-
-			// default inputType
-			if (empty($arrData['inputType']))
-			{
-				$arrData['inputType'] = 'text';
-			}
-			if (!isset($arrData['eval']['mandatory']))
-			{
-				$arrData['eval']['mandatory'] = true;
-			}
-			$arrData['eval']['required'] = $arrData['eval']['mandatory'];
-
-			$strClass = $GLOBALS['BE_FFL'][$arrData['inputType']];
-			if (!$strClass)
-			{
-				$_SESSION['TL_ERROR'][] = 'Unknown input type: "' . $strClass . '" given for field "' . $strName . '"!';
-				$this->redirect('contao/main.php?do=dataset_import');
-			}
-
-			// fill the virtual dca
-			$GLOBALS['TL_DCA']['tl_dataset_import']['fields'][$strName] = $arrData;
-		}
-	}
-
-
-	/**
-	 * Generate the virtual dca structure.
-	 */
 	protected function generateDCA()
 	{
 		if (strlen($this->Input->get('dataset')))
@@ -633,7 +613,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					$xpath = new DOMXPath($doc);
 					$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
 
-					$this->generateDCAFrom($doc, $xpath);
+					$this->generateWidgets($doc, $xpath);
 				}
 			}
 		}
@@ -678,8 +658,6 @@ class WebsiteBuilderDatasetImport extends BackendModule
 				{
 					$xpath = new DOMXPath($doc);
 					$xpath->registerNamespace('wb', 'http://www.infinitysoft.de/contao/website_builder');
-
-					$this->generateDCAFrom($doc, $xpath);
 
 					$arrWidgets = array();
 
@@ -816,7 +794,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
                                         // store the updated data
                                         $objDatabase
                                             ->prepare("UPDATE {$strTable} %s WHERE id=?")
-                                            ->set($objRecord)
+                                            ->set((array) $objRecord)
                                             ->execute($objRecord->id);
 
 										// and destroy connector
@@ -894,6 +872,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
 								$_SESSION['TL_ERROR'][] = $e->getMessage();
 							}
 						}
+
+                        $this->redirect('contao/main.php?do=dataset_import');
 					}
 
 					$this->Template->variables = $arrWidgets;
@@ -903,12 +883,35 @@ class WebsiteBuilderDatasetImport extends BackendModule
 			$this->redirect('contao/main.php?do=dataset_import');
 		}
 
+        $arrDatasets = $this->loadDatasets();
+
+		// no datasets configured
+        if ($arrDatasets === null) {
+			$_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['missing_configuration'];
+        }
+
+        // add datasets for selection
+        else if (count($arrDatasets))
+        {
+            $this->Session->set('datasets', serialize($arrDatasets));
+            $this->Template->datasets = $arrDatasets;
+        }
+
+        // no datasets found
+        else
+        {
+            $_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['faulty_configuration'];
+        }
+	}
+
+    protected function loadDatasets()
+    {
+        $arrDatasets = array();
+
 		// no operation, list importable datasets
 		$GLOBALS['TL_CONFIG']['website_builder_datasets'] = deserialize($GLOBALS['TL_CONFIG']['website_builder_datasets'], true);
 		if (is_array($GLOBALS['TL_CONFIG']['website_builder_datasets']) && count($GLOBALS['TL_CONFIG']['website_builder_datasets']))
 		{
-			$arrDatasets = array();
-
 			for ($n=0; $n<count($GLOBALS['TL_CONFIG']['website_builder_datasets']); $n++)
 			{
 				$strDataset = $GLOBALS['TL_CONFIG']['website_builder_datasets'][$n];
@@ -991,25 +994,13 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					}
 				}
 			}
-
-			if (count($arrDatasets))
-			{
-				$this->Session->set('datasets', serialize($arrDatasets));
-				$this->Template->datasets = $arrDatasets;
-			}
-			else
-			{
-				$_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['faulty_configuration'];
-			}
 		}
+        else {
+            return null;
+        }
 
-		// no datasets configured
-		else
-		{
-			$_SESSION['TL_ERROR'][] = $GLOBALS['TL_LANG']['tl_website_builder_dataset_import']['missing_configuration'];
-		}
-	}
-
+        return $arrDatasets;
+    }
 
 	/**
 	 * Extend a dataset

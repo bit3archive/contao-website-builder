@@ -40,16 +40,15 @@ $GLOBALS['BE_MOD'] = array_merge(
 		(
 			'dataset_import' => array
 			(
-				'tables'     => array('tl_dataset_import'),
 				'callback'   => 'WebsiteBuilderDatasetImport',
-				'icon'       => 'system/modules/website_builder/html/dataset_import.png',
-				'stylesheet' => 'system/modules/website_builder/html/stylesheet.css'
+				'icon'       => 'system/modules/website_builder/assets/images/dataset_import.png',
+				'stylesheet' => 'system/modules/website_builder/assets/css/backend.css'
 			),
 			'multilang' => array
 			(
 				'callback'   => 'WebsiteBuilderMultilang',
-				'icon'       => 'system/modules/website_builder/html/multilang.png',
-				'stylesheet' => 'system/modules/website_builder/html/stylesheet.css'
+				'icon'       => 'system/modules/website_builder/assets/images/multilang.png',
+				'stylesheet' => 'system/modules/website_builder/assets/css/backend.css'
 			)
 		)
 	),
