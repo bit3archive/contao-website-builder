@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file original="system/modules/website_builder/languages/de/tl_website_builder_dataset_import.php" source-language="de" datatype="php" date="2012-11-25T19:49:44+00:00" target-language="de">
+    <body>
+      <trans-unit id="tl_website_builder_dataset_import.dataset_selection">
+        <source xml:lang="de">Datens&#xE4;tze importieren</source>
+        <target xml:lang="de">Datens&#xE4;tze importieren</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_dataset_import.submit">
+        <source xml:lang="de">Importieren</source>
+        <target xml:lang="de">Importieren</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_dataset_import.variables">
+        <source xml:lang="de">Variablen festlegen</source>
+        <target xml:lang="de">Variablen festlegen</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_dataset_import.missing_configuration">
+        <source xml:lang="de">Sie m&#xFC;ssen in den Einstellungen zuerst einige Datensatzdefinitions-Dateien konfigurieren, um diese Funktion nutzen zu k&#xF6;nnen!</source>
+        <target xml:lang="de">Sie m&#xFC;ssen in den Einstellungen zuerst einige Datensatzdefinitions-Dateien konfigurieren, um diese Funktion nutzen zu k&#xF6;nnen!</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_dataset_import.faulty_configuration">
+        <source xml:lang="de">Die Konfigurierten Datensatzdefinitions-Dateien enthalten keine brauchbaren Informationen, eventuell wurden die Dateien entfernt oder sind vor&#xFC;bergehend nicht verf&#xFC;gbar. Pr&#xFC;fen Sie Ihre Einstellungen!</source>
+        <target xml:lang="de">Die Konfigurierten Datensatzdefinitions-Dateien enthalten keine brauchbaren Informationen, eventuell wurden die Dateien entfernt oder sind vor&#xFC;bergehend nicht verf&#xFC;gbar. Pr&#xFC;fen Sie Ihre Einstellungen!</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_dataset_import.success">
+        <source xml:lang="de">Import von &lt;strong&gt;%s&lt;/strong&gt; abgeschlossen</source>
+        <target xml:lang="de">Import von &lt;strong&gt;%s&lt;/strong&gt; abgeschlossen</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

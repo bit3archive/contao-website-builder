@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file original="system/modules/website_builder/languages/de/tl_website_builder_multilang.php" source-language="de" datatype="php" date="2012-11-25T19:49:44+00:00" target-language="de">
+    <body>
+      <trans-unit id="tl_website_builder_multilang.headline">
+        <source xml:lang="de">Mehrsprachige Seitenstrukturen</source>
+        <target xml:lang="de">Mehrsprachige Seitenstrukturen</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.missing_changelanguage">
+        <source xml:lang="de">Die Erweiterung &lt;a href="contao/main.php?do=repository_catalog&amp;view=changelanguage"&gt;changelanguage&lt;/a&gt; wird f&#xFC;r dieses Feature ben&#xF6;tigt!</source>
+        <target xml:lang="de">Die Erweiterung &lt;a href="contao/main.php?do=repository_catalog&amp;view=changelanguage"&gt;changelanguage&lt;/a&gt; wird f&#xFC;r dieses Feature ben&#xF6;tigt!</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.duplicate_language">
+        <source xml:lang="de">F&#xFC;r die Domain %s existieren in der Sprache %s zwei Seiten, IDs: %s, %s!</source>
+        <target xml:lang="de">F&#xFC;r die Domain %s existieren in der Sprache %s zwei Seiten, IDs: %s, %s!</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.missing_root">
+        <source xml:lang="de">F&#xFC;r die Domain %s wurde in der Sprache %s kein Startpunkt gefunden!</source>
+        <target xml:lang="de">F&#xFC;r die Domain %s wurde in der Sprache %s kein Startpunkt gefunden!</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.missing_fallback">
+        <source xml:lang="de">F&#xFC;r die Domain %s wurde kein Sprachen-Fallback gefunden!</source>
+        <target xml:lang="de">F&#xFC;r die Domain %s wurde kein Sprachen-Fallback gefunden!</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.change_dns">
+        <source xml:lang="de">Domain wechseln</source>
+        <target xml:lang="de">Domain wechseln</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.duplicate_page_language">
+        <source xml:lang="de">Die Seite %s (%s) ID %s und ihre Fallback Seite %s (%s) ID %s haben die gleiche Sprache %s!</source>
+        <target xml:lang="de">Die Seite %s (%s) ID %s und ihre Fallback Seite %s (%s) ID %s haben die gleiche Sprache %s!</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.created">
+        <source xml:lang="de">Die neue Seitenstruktur wurde erstellt.</source>
+        <target xml:lang="de">Die neue Seitenstruktur wurde erstellt.</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.structure">
+        <source xml:lang="de">Struktur&#xFC;bersicht</source>
+        <target xml:lang="de">Struktur&#xFC;bersicht</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.source_language.0">
+        <source xml:lang="de">Ausgangssprache</source>
+        <target xml:lang="de">Ausgangssprache</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.source_language.1">
+        <source xml:lang="de">W&#xE4;hlen Sie hier die Sprache aus, dessen Struktur kopiert werden soll.</source>
+        <target xml:lang="de">W&#xE4;hlen Sie hier die Sprache aus, dessen Struktur kopiert werden soll.</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.target_language.0">
+        <source xml:lang="de">Sprache</source>
+        <target xml:lang="de">Sprache</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.target_language.1">
+        <source xml:lang="de">W&#xE4;hlen Sie hier die Sprache die, die neu erstellt werden soll.</source>
+        <target xml:lang="de">W&#xE4;hlen Sie hier die Sprache die, die neu erstellt werden soll.</target>
+      </trans-unit>
+      <trans-unit id="tl_website_builder_multilang.create_language">
+        <source xml:lang="de">Neue Sprachversion erstellen</source>
+        <target xml:lang="de">Neue Sprachversion erstellen</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

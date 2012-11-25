@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+	<file original="system/modules/website_builder/languages/de/tl_settings.php" source-language="de" datatype="php"
+		  date="2012-11-25T19:49:44+00:00" target-language="de">
+		<body>
+			<trans-unit id="tl_settings.website_builder_legend">
+				<source xml:lang="de">Website Builder</source>
+				<target xml:lang="de">Website Builder</target>
+			</trans-unit>
+			<trans-unit id="tl_settings.website_builder_datasets.0">
+				<source xml:lang="de">Datensatzdefinitions-Dateien</source>
+				<target xml:lang="de">Datensatzdefinitions-Dateien</target>
+			</trans-unit>
+			<trans-unit id="tl_settings.website_builder_datasets.1">
+				<source xml:lang="de">Liste aller Datensatzdefinitions-Dateien. Es k&#xF6;nnen sowohl lokale Dateipfade,
+					als auch URLs angegeben werden.
+				</source>
+				<target xml:lang="de">Liste aller Datensatzdefinitions-Dateien. Es k&#xF6;nnen sowohl lokale Dateipfade,
+					als auch URLs angegeben werden.
+				</target>
+			</trans-unit>
+		</body>
+	</file>
+</xliff>

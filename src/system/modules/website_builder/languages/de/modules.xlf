@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file original="system/modules/website_builder/languages/de/modules.php" source-language="de" datatype="php" date="2012-11-25T19:49:44+00:00" target-language="de">
+    <body>
+      <trans-unit id="MOD.website_builder">
+        <source xml:lang="de">Website Builder</source>
+        <target xml:lang="de">Website Builder</target>
+      </trans-unit>
+      <trans-unit id="MOD.dataset_import.0">
+        <source xml:lang="de">Datens&#xE4;tze importieren</source>
+        <target xml:lang="de">Datens&#xE4;tze importieren</target>
+      </trans-unit>
+      <trans-unit id="MOD.dataset_import.1">
+        <source xml:lang="de"></source>
+        <target xml:lang="de"></target>
+      </trans-unit>
+      <trans-unit id="MOD.multilang.0">
+        <source xml:lang="de">Mehrsprachenstruktur</source>
+        <target xml:lang="de">Mehrsprachenstruktur</target>
+      </trans-unit>
+      <trans-unit id="MOD.multilang.1">
+        <source xml:lang="de"></source>
+        <target xml:lang="de"></target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>
