@@ -1,0 +1,24 @@
+[main]
+host = https://www.transifex.com
+type = XLIFF
+
+[contao-websitebuilder.master-modules]
+file_filter = src/system/modules/website_builder/languages/<lang>/modules.xlf
+source_file = src/system/modules/website_builder/languages/de/modules.xlf
+source_lang = de
+
+[contao-websitebuilder.master-tl-settings]
+file_filter = src/system/modules/website_builder/languages/<lang>/tl_settings.xlf
+source_file = src/system/modules/website_builder/languages/de/tl_settings.xlf
+source_lang = de
+
+[contao-websitebuilder.master-tl-website-builder-dataset-import]
+file_filter = src/system/modules/website_builder/languages/<lang>/tl_website_builder_dataset_import.xlf
+source_file = src/system/modules/website_builder/languages/de/tl_website_builder_dataset_import.xlf
+source_lang = de
+
+[contao-websitebuilder.master-tl-website-builder-multilang]
+file_filter = src/system/modules/website_builder/languages/<lang>/tl_website_builder_multilang.xlf
+source_file = src/system/modules/website_builder/languages/de/tl_website_builder_multilang.xlf
+source_lang = de
+
