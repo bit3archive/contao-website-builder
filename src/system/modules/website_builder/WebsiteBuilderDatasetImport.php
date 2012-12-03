@@ -701,8 +701,6 @@ class WebsiteBuilderDatasetImport extends BackendModule
         curl_setopt($curl, CURLOPT_URL, $strUrl);
         // everythink is binary
         curl_setopt($curl, CURLOPT_BINARYTRANSFER, true);
-        // follow redirects
-        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
         // fix ssl problems
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
         // do not fetch headers
