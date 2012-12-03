@@ -10,6 +10,7 @@
  * @license http://opensource.org/licenses/lgpl-3.0.html LGPL
  */
 
+use Model\QueryBuilder;
 
 /**
  * Class WebsiteBuilderDatasetImport
@@ -49,11 +50,19 @@ class WebsiteBuilderDatasetImport extends BackendModule
 
 
     /**
-     * Information about "late update" fields, stored as reference of table => field => value
+     * Information about "late update" fields, stored as reference of table => field => values
      *
      * @var array
      */
     protected $arrLateUpdate;
+
+
+    /**
+     * Information about "database files", stored as reference of table => field => file paths
+     *
+     * @var array
+     */
+    protected $arrDatabaseFiles;
 
 
     /**
@@ -227,7 +236,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
         // read new record object
         $objRecord = (object) $objDatabase
             ->prepare("SELECT * FROM {$strTable} WHERE id=?")
-            ->execute($insertId)
+            ->executeUncached($insertId)
             ->fetchAssoc();
 
         // set tstamp
@@ -254,6 +263,9 @@ class WebsiteBuilderDatasetImport extends BackendModule
         // collection of records that should be updated lately
         $arrLateUpdate = array();
 
+        // collection of database files
+        $arrDatabaseFiles = array();
+
         // fill the data fields
         $nodesField = $xpath->query('wb:field', $domNode);
         for ($i = 0; $i < $nodesField->length; $i++) {
@@ -274,6 +286,8 @@ class WebsiteBuilderDatasetImport extends BackendModule
             $blnEvalUser     = $xpath->evaluate('boolean(@eval-user)', $nodeField);
             $blnForceArray   = $xpath->evaluate('boolean(@force-array)', $nodeField);
             $blnNovars       = $xpath->evaluate('boolean(@novars)', $nodeField);
+            $blnIsDbFile     = version_compare(VERSION, '3', '>=')
+                && $GLOBALS['TL_DCA'][$strTable]['fields'][$strName]['inputType'] == 'fileTree';
             $strValue        = trim($nodeField->textContent);
 
             // inherit from parent
@@ -303,15 +317,26 @@ class WebsiteBuilderDatasetImport extends BackendModule
                     }
                     else {
                         throw new Exception(sprintf(
-                            'Could not inherit "%s.%s" as "%s.%s", row id "%s" was not found!',
-                            $strInheritTable,
-                            $strInheritField,
-                            $strTable,
-                            $strName,
-                            $strPid
-                        ));
+                                                'Could not inherit "%s.%s" as "%s.%s", row id "%s" was not found!',
+                                                $strInheritTable,
+                                                $strInheritField,
+                                                $strTable,
+                                                $strName,
+                                                $strPid
+                                            ));
                     }
                 }
+            }
+
+            // field is a database file
+            if ($blnIsDbFile) {
+                $arrDatabaseFiles[$strName] = array
+                (
+                    'eval'       => $blnEval,
+                    'forceArray' => $blnForceArray,
+                    'value'      => $strValue
+                );
+                continue;
             }
 
             // replace all variables
@@ -341,12 +366,12 @@ class WebsiteBuilderDatasetImport extends BackendModule
                 if (false === ($varEvaluatedValue = eval('return ' . $strValue . ';'))) {
                     unset($varEvaluatedValue);
                     throw new Exception(sprintf(
-                        'Evaluation of value "%s" failed for field "%s"!',
-                        htmlentities(
-                            $strValue
-                        ),
-                        $strName
-                    ));
+                                            'Evaluation of value "%s" failed for field "%s"!',
+                                            htmlentities(
+                                                $strValue
+                                            ),
+                                            $strName
+                                        ));
                 }
                 else {
                     $strValue = $varEvaluatedValue;
@@ -359,22 +384,22 @@ class WebsiteBuilderDatasetImport extends BackendModule
                 if (false === eval($strValue)) {
                     unset($varEvaluatedValue);
                     throw new Exception(sprintf(
-                        'Evaluation of value "%s" failed for field "%s"!',
-                        htmlentities(
-                            $strValue
-                        ),
-                        $strName
-                    ));
+                                            'Evaluation of value "%s" failed for field "%s"!',
+                                            htmlentities(
+                                                $strValue
+                                            ),
+                                            $strName
+                                        ));
                 }
                 else if (!isset($varEvaluatedValue)) {
                     unset($varEvaluatedValue);
                     throw new Exception(sprintf(
-                        'Evaluation of value "%s" for field "%s" have to set the $varEvaluatedValue variable!',
-                        htmlentities(
-                            $strValue
-                        ),
-                        $strName
-                    ));
+                                            'Evaluation of value "%s" for field "%s" have to set the $varEvaluatedValue variable!',
+                                            htmlentities(
+                                                $strValue
+                                            ),
+                                            $strName
+                                        ));
                 }
                 else {
                     $strValue = $varEvaluatedValue;
@@ -413,11 +438,9 @@ class WebsiteBuilderDatasetImport extends BackendModule
         if ($objDatabase->fieldExists('sorting', $strTable)) {
             if ($objDatabase->fieldExists('pid', $strTable)) {
                 $objSorting = $objDatabase
-                    ->prepare(
-                    "SELECT MAX(sorting) as sorting
-                     FROM {$strTable}
-                     WHERE pid=?"
-                )
+                    ->prepare("SELECT MAX(sorting) as sorting
+                               FROM {$strTable}
+                               WHERE pid=?")
                     ->executeUncached($objRecord->pid);
             }
             else {
@@ -433,7 +456,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
         $objDatabase
             ->prepare("UPDATE {$strTable} %s WHERE id=?")
             ->set((array) $objRecord)
-            ->execute($objRecord->id);
+            ->executeUncached($objRecord->id);
 
         // set the local var
         if ($strVar) {
@@ -446,6 +469,14 @@ class WebsiteBuilderDatasetImport extends BackendModule
                 $this->arrLateUpdate[$strTable] = array();
             }
             $this->arrLateUpdate[$strTable][$objRecord->id] = $arrLateUpdate;
+        }
+
+        // add database files
+        if (count($arrDatabaseFiles)) {
+            if (!isset($this->arrDatabaseFiles[$strTable])) {
+                $this->arrDatabaseFiles[$strTable] = array();
+            }
+            $this->arrDatabaseFiles[$strTable][$objRecord->id] = $arrDatabaseFiles;
         }
 
         // import the child records
@@ -501,18 +532,18 @@ class WebsiteBuilderDatasetImport extends BackendModule
                 }
                 else {
                     throw new Exception(sprintf(
-                        'Variable part "%s" from "%s" not available.<br/>
+                                            'Variable part "%s" from "%s" not available.<br/>
                          <span style="white-space:pre">%s</span><br/>
                          <span style="white-space:pre">%s</span>',
-                        $strKey,
-                        $strOriginalKey,
-                        htmlentities(
-                            $arrMatches[0]
-                        ),
-                        htmlentities(
-                            print_r(array_keys($this->arrVariables), true)
-                        )
-                    ));
+                                            $strKey,
+                                            $strOriginalKey,
+                                            htmlentities(
+                                                $arrMatches[0]
+                                            ),
+                                            htmlentities(
+                                                print_r(array_keys($this->arrVariables), true)
+                                            )
+                                        ));
                 }
             }
             $varValue = $varTmp;
@@ -539,17 +570,17 @@ class WebsiteBuilderDatasetImport extends BackendModule
         }
 
         throw new Exception(sprintf(
-            'Variable "%s" not available.<br/>
+                                'Variable "%s" not available.<br/>
              <span style="white-space:pre">%s</span><br/>
              <span style="white-space:pre">%s</span>',
-            $strKey,
-            htmlentities(
-                $arrMatches[0]
-            ),
-            htmlentities(
-                print_r(array_keys($this->arrVariables), true)
-            )
-        ));
+                                $strKey,
+                                htmlentities(
+                                    $arrMatches[0]
+                                ),
+                                htmlentities(
+                                    print_r(array_keys($this->arrVariables), true)
+                                )
+                            ));
     }
 
 
@@ -606,6 +637,129 @@ class WebsiteBuilderDatasetImport extends BackendModule
             $this->mkdirs(dirname($strPath));
             mkdir($strPath);
         }
+    }
+
+
+    /**
+     * Resolve database files.
+     *
+     * @param string|array $varFile
+     * Pathname or array of pathnames to the files.
+     */
+    protected function resolveFiles($varFile)
+    {
+        if (!$varFile) {
+            return 0;
+        }
+        else if (is_array($varFile)) {
+            foreach ($varFile as $key => $value) {
+                $varFile[$key] = $this->resolveFiles($value);
+            }
+        }
+        else {
+            $arrOptions = array(
+                'table'  => 'tl_files',
+                'column' => 'path'
+            );
+            $strQuery = QueryBuilder::find($arrOptions);
+
+            /** @var \Database $db */
+            $db = Database::getInstance();
+            /** @var \Database\Statement $query */
+            $query = $db->prepare($strQuery);
+            /** @var \Database\Result $result */
+            $result = $query->executeUncached($varFile);
+
+            if ($result->next()) {
+                $varFile = $result->id;
+            }
+            else {
+                throw new Exception(
+                    sprintf(
+                        'Could not find file "%s" in database!',
+                        $varFile
+                    )
+                );
+            }
+        }
+
+        return $varFile;
+    }
+
+
+    /**
+     * Fetch a url with curl.
+     *
+     * @param string    $strUrl
+     * @param ressource $resFile
+     */
+    protected function fetchUrl($strUrl, $resFile = false)
+    {
+        // init curl
+        $curl = curl_init();
+        // set the url
+        curl_setopt($curl, CURLOPT_URL, $strUrl);
+        // everythink is binary
+        curl_setopt($curl, CURLOPT_BINARYTRANSFER, true);
+        // follow redirects
+        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+        // fix ssl problems
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        // do not fetch headers
+        curl_setopt($curl, CURLOPT_HEADER, false);
+        // only wait 5 seconds
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 5);
+
+        if (is_resource($resFile)) {
+            // write into file
+            curl_setopt($curl, CURLOPT_FILE, $resFile);
+        }
+        else {
+            // return content
+            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        }
+
+        // fetch url
+        $data = curl_exec($curl);
+        // close curl
+        curl_close($curl);
+
+        return $data;
+    }
+
+
+    /**
+     * Filter include and exclude patterns.
+     *
+     * @param string $strRelPath
+     * @param array  $arrInclude
+     * @param array $arrExclude
+     */
+    public function filterInExclude($strRelPath, array $arrInclude, array $arrExclude)
+    {
+        if (count($arrExclude)) {
+            foreach ($arrExclude as $strExclude) {
+                if (fnmatch($strExclude, $strRelPath)) {
+                    // file is excluded
+                    return false;
+                }
+            }
+        }
+
+        if (count($arrInclude)) {
+            foreach ($arrInclude as $strInclude) {
+                if (fnmatch($strInclude, $strRelPath)) {
+                    // file is included
+                    return true;
+                }
+            }
+
+            // file is not in include pattern
+            return false;
+        }
+
+        // (default) file is allowed
+        return true;
     }
 
 
@@ -677,10 +831,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
                     if (!count($arrWidgets) // no variables
                         || $this->Input->post('FORM_SUBMIT') == 'dataset_import'
                     ) {
-                        $this->arrData       = array();
-                        $this->arrVariables  = array();
-                        $this->arrLateUpdate = array();
-                        $this->arrCreated    = array();
+                        $this->arrData          = array();
+                        $this->arrVariables     = array();
+                        $this->arrLateUpdate    = array();
+                        $this->arrDatabaseFiles = array();
+                        $this->arrCreated       = array();
 
                         $blnDoNotSubmit = false;
                         foreach ($arrWidgets as $strName => $objWidget) {
@@ -725,7 +880,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
                                         // read current record
                                         $objRecord = (object) $objDatabase
                                             ->prepare("SELECT * FROM {$strTable} WHERE id=?")
-                                            ->execute($strId)
+                                            ->executeUncached($strId)
                                             ->fetchAssoc();
 
                                         foreach ($arrLateUpdate as $strName => $arrValue) {
@@ -758,13 +913,11 @@ class WebsiteBuilderDatasetImport extends BackendModule
                                         $objDatabase
                                             ->prepare("UPDATE {$strTable} %s WHERE id=?")
                                             ->set((array) $objRecord)
-                                            ->execute($objRecord->id);
-
-                                        // and destroy connector
-                                        unset($objConnector);
+                                            ->executeUncached($objRecord->id);
                                     }
                                 }
 
+                                // create directories
                                 $nodesMkdir = $xpath->evaluate('wb:mkdir', $nodeDataset);
                                 for ($i = 0; $i < $nodesMkdir->length; $i++) {
                                     $strPath = $nodesMkdir->item($i)->textContent;
@@ -777,6 +930,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
                                     $this->mkdirs(TL_ROOT . '/' . $strPath);
                                 }
 
+                                // create files
                                 $nodesMkfile = $xpath->evaluate('wb:mkfile', $nodeDataset);
                                 for ($i = 0; $i < $nodesMkfile->length; $i++) {
                                     $strPath = $nodesMkfile->item($i)->textContent;
@@ -791,43 +945,119 @@ class WebsiteBuilderDatasetImport extends BackendModule
                                     file_put_contents(TL_ROOT . '/' . $strPath, "");
                                 }
 
+                                // load archives
                                 $nodesLoad = $xpath->evaluate('wb:load', $nodeDataset);
                                 for ($i = 0; $i < $nodesLoad->length; $i++) {
-                                    $nodeLoad  = $nodesLoad->item($i);
-                                    $strTarget = preg_replace_callback(
+                                    $nodeLoad           = $nodesLoad->item($i);
+                                    $strTarget          = trim(preg_replace_callback(
                                         self::$VAR_REPLACE_REGEXP,
                                         array(&$this, 'replaceVariable'),
                                         $xpath->evaluate('string(@target)', $nodeLoad)
-                                    );
-                                    $blnUnzip  = preg_replace_callback(
+                                    ));
+                                    $blnUnzip           = (bool) preg_replace_callback(
                                         self::$VAR_REPLACE_REGEXP,
                                         array(&$this, 'replaceVariable'),
                                         $xpath->evaluate('boolean(@unzip)', $nodeLoad)
                                     );
-                                    $strSource = preg_replace_callback(
-                                        self::$VAR_REPLACE_REGEXP,
-                                        array(&$this, 'replaceVariable'),
-                                        $nodeLoad->textContent
+                                    $arrInclude = array_filter(
+                                        array_map(
+                                            'trim',
+                                            explode(
+                                                '|',
+                                                preg_replace_callback(
+                                                    self::$VAR_REPLACE_REGEXP,
+                                                    array(&$this, 'replaceVariable'),
+                                                    $xpath->evaluate('string(@include)', $nodeLoad)
+                                                )
+                                            )
+                                        )
                                     );
-
+                                    $arrExclude = array_filter(
+                                        array_map(
+                                            'trim',
+                                            explode(
+                                                '|',
+                                                preg_replace_callback(
+                                                    self::$VAR_REPLACE_REGEXP,
+                                                    array(&$this, 'replaceVariable'),
+                                                    $xpath->evaluate('string(@exclude)', $nodeLoad)
+                                                )
+                                            )
+                                        )
+                                    );
+                                    $intStripComponents = (int) $xpath->evaluate(
+                                        'string(@strip-components)',
+                                        $nodeLoad
+                                    );
+                                    $strSource          = trim(
+                                        preg_replace_callback(
+                                            self::$VAR_REPLACE_REGEXP,
+                                            array(&$this, 'replaceVariable'),
+                                            $nodeLoad->textContent
+                                        )
+                                    );
                                     $strName = basename($strSource);
+                                    $strUrl  = false;
+
                                     // absolutize source
-                                    if (!(preg_match('#^https?://#', $strSource)
-                                        || preg_match('#^/#', $strSource))
-                                    ) {
+                                    if (preg_match('#^https?://#', $strSource)) {
+                                        $strUrl = $strSource;
+
+                                        // create temporary file
+                                        $strSource = tempnam(sys_get_temp_dir(), 'wbload_');
+                                        // open temporary file
+                                        $temp = fopen($strSource, 'wb');
+
+                                        $this->fetchUrl($strUrl, $temp);
+
+                                        // close temporary file
+                                        fclose($temp);
+                                    }
+                                    else if (!preg_match('#^/#', $strSource)) {
                                         $strSource = TL_ROOT . '/' . $strSource;
                                     }
 
                                     if (false === @copy($strSource, TL_ROOT . '/' . $strTarget . '/' . $strName)) {
-                                        throw new Exception('Copy "' . $strSource . '" to "' . $strTarget . '/' . $strName . '" failed!');
+                                        // delete temporary file
+                                        if ($strUrl) {
+                                            unlink($strSource);
+                                        }
+                                        throw new Exception('Copy "' . ($strUrl ? $strUrl : $strSource) . '" to "' . $strTarget . '/' . $strName . '" failed!');
+                                    }
+                                    // delete temporary file
+                                    if ($strUrl) {
+                                        unlink($strSource);
                                     }
 
                                     if ($blnUnzip) {
                                         $zipReader = new ZipReader($strTarget . '/' . $strName);
                                         while ($zipReader->next()) {
-                                            $this->mkdirs(TL_ROOT . '/' . $strTarget . '/' . $zipReader->file_dirname);
+                                            if ($intStripComponents > 0) {
+                                                if (count(
+                                                    explode('/', $zipReader->file_dirname)
+                                                ) < $intStripComponents
+                                                ) {
+                                                    continue;
+                                                }
+
+                                                $arrParts = explode('/', $zipReader->file_dirname);
+                                                for ($j = 0; $j < $intStripComponents; $j++) {
+                                                    array_shift($arrParts);
+                                                }
+                                                $strPath = implode('/', $arrParts);
+                                            }
+                                            else {
+                                                $strPath = $zipReader->file_dirname;
+                                            }
+                                            $strRelPath = $strTarget . '/' . $strPath . '/' . $zipReader->file_basename;
+
+                                            if (!$this->filterInExclude($strRelPath, $arrInclude, $arrExclude)) {
+                                                continue;
+                                            }
+
+                                            $this->mkdirs(TL_ROOT . '/' . $strTarget . '/' . $strPath);
                                             file_put_contents(
-                                                TL_ROOT . '/' . $strTarget . '/' . $zipReader->file_name,
+                                                TL_ROOT . '/' . $strRelPath,
                                                 $zipReader->unzip()
                                             );
                                         }
@@ -835,6 +1065,63 @@ class WebsiteBuilderDatasetImport extends BackendModule
                                         @unlink(TL_ROOT . '/' . $strTarget . '/' . $strName);
                                     }
                                 }
+
+                                // sync fs
+                                if (version_compare(VERSION, '3', '>=')) {
+                                    $this->loadLanguageFile('tl_files');
+                                    $this->loadDataContainer('tl_files');
+
+                                    $dc = new DC_Folder('tl_files');
+
+                                    // silent sync
+                                    $dc->sync();
+                                }
+
+                                // update database files
+                                foreach ($this->arrDatabaseFiles as $strTable => $arrTable) {
+                                    foreach ($arrTable as $strId => $arrDatabaseFiles) {
+                                        // read current record
+                                        $objRecord = (object) $objDatabase
+                                            ->prepare("SELECT * FROM {$strTable} WHERE id=?")
+                                            ->executeUncached($strId)
+                                            ->fetchAssoc();
+
+                                        foreach ($arrDatabaseFiles as $strName => $arrValue) {
+                                            // no try-catch here, because if variable is not available here, i can not fallback!
+                                            $strValue = preg_replace_callback(
+                                                self::$VAR_REPLACE_REGEXP,
+                                                array(&$this, 'replaceVariable'),
+                                                $arrValue['value']
+                                            );
+
+                                            if ($arrValue['eval']) {
+                                                if (false === ($strEvaluatedValue = eval('return ' . $strValue . ';'))) {
+                                                    throw new Exception('Evaluation of value "' . htmlentities(
+                                                        $strValue
+                                                    ) . '" failed for field "' . $strName . '"!');
+                                                }
+                                                else {
+                                                    $strValue = $strEvaluatedValue;
+                                                }
+                                            }
+
+                                            if ($arrValue['forceArray'] && !is_array($strValue)) {
+                                                $strValue = array($strValue);
+                                            }
+
+                                            $strValue = $this->resolveFiles($strValue);
+
+                                            $objRecord->$strName = $strValue;
+                                        }
+
+                                        // store the updated data
+                                        $objDatabase
+                                            ->prepare("UPDATE {$strTable} %s WHERE id=?")
+                                            ->set((array) $objRecord)
+                                            ->executeUncached($objRecord->id);
+                                    }
+                                }
+
 
                                 $this->log(
                                     preg_replace(
@@ -908,6 +1195,18 @@ class WebsiteBuilderDatasetImport extends BackendModule
             for ($n = 0; $n < count($GLOBALS['TL_CONFIG']['website_builder_datasets']); $n++) {
                 $strDataset = $GLOBALS['TL_CONFIG']['website_builder_datasets'][$n];
 
+                $strUrl = false;
+                if (preg_match('#^https?://#', $strDataset)) {
+                    $strUrl = $strDataset;
+                    // create temporary file
+                    $strDataset = tempnam(sys_get_temp_dir(), 'wbdataset_');
+                    // open temporary file
+                    $temp = fopen($strDataset, 'wb');
+                    // fetch url
+                    $this->fetchUrl($strUrl, $temp);
+                    // close temporary file
+                    fclose($temp);
+                }
                 if (preg_match('#^https?://#', $strDataset)
                     || preg_match('#^/#', $strDataset)
                     || file_exists($strDataset = TL_ROOT . '/' . $strDataset)
@@ -933,7 +1232,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
                                         || preg_match('#^/#', $strImport)
                                         || file_exists(TL_ROOT . '/' . $strDataset))
                                     ) {
-                                        $strImport = preg_replace('#/[^/]*$#', '/', $strDataset) . $strImport;
+                                        $strImport = preg_replace('#/[^/]*$#', '/', ($strUrl ? $strUrl : $strDataset)) . $strImport;
                                     }
                                     $GLOBALS['TL_CONFIG']['website_builder_datasets'][] = $strImport;
                                 }
@@ -985,6 +1284,10 @@ class WebsiteBuilderDatasetImport extends BackendModule
                             }
                         }
                     }
+                }
+                if ($strUrl) {
+                    // delete temporary file
+                    unlink($strDataset);
                 }
             }
         }

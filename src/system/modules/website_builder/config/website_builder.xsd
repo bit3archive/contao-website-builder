@@ -63,6 +63,9 @@
 								<xsd:extension base="xsd:string">
 									<xsd:attribute name="target" type="xsd:string" />
 									<xsd:attribute name="unzip" default="false" type="xsd:boolean" />
+									<xsd:attribute name="strip-components" default="0" type="xsd:integer" />
+									<xsd:attribute name="include" type="xsd:string" />
+									<xsd:attribute name="exclude" type="xsd:string" />
 								</xsd:extension>
 							</xsd:simpleContent>
 						</xsd:complexType>
