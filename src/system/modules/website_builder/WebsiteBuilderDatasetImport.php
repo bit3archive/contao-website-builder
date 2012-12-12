@@ -743,16 +743,21 @@ class WebsiteBuilderDatasetImport extends BackendModule
 					// read headers
 					fseek($headerFile, 0);
 					$header = stream_get_contents($headerFile);
+
 					// reset temporary headers file
 					ftruncate($headerFile, 0);
+					fseek($headerFile, 0);
+
+					// reset content file
+					ftruncate($resFile, 0);
+					fseek($resFile, 0);
 
 					if (preg_match('/(?:Location|URI):(.*?)\n/', $header, $matches)) {
 						// set redirect url
 						curl_setopt($curl, CURLOPT_URL, trim($matches[1]));
 					}
 					else {
-						curl_close($curl);
-						return false;
+						throw new Exception('Missing redirect location for ' . $strUrl);
 					}
 				}
 			} while ($httpCode == 301 || $httpCode == 302);
