@@ -1085,7 +1085,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										$strSource = TL_ROOT . '/' . $strSource;
 									}
 
-									if (false === @copy($strSource, TL_ROOT . '/' . $strTarget . '/' . $strName)) {
+									if (false === copy($strSource, TL_ROOT . '/' . $strTarget . '/' . $strName)) {
 										// delete temporary file
 										if ($strUrl) {
 											unlink($strSource);
@@ -1093,6 +1093,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										throw new Exception('Copy "' . ($strUrl ? $strUrl
 											: $strSource) . '" to "' . $strTarget . '/' . $strName . '" failed!');
 									}
+
 									// delete temporary file
 									if ($strUrl) {
 										unlink($strSource);
@@ -1102,14 +1103,12 @@ class WebsiteBuilderDatasetImport extends BackendModule
 										$zipReader = new ZipReader($strTarget . '/' . $strName);
 										while ($zipReader->next()) {
 											if ($intStripComponents > 0) {
-												if (count(
-													explode('/', $zipReader->file_dirname)
-												) < $intStripComponents
-												) {
+												$arrParts = explode('/', $zipReader->file_dirname);
+
+												if (count($arrParts) < $intStripComponents) {
 													continue;
 												}
 
-												$arrParts = explode('/', $zipReader->file_dirname);
 												for ($j = 0; $j < $intStripComponents; $j++) {
 													array_shift($arrParts);
 												}
@@ -1131,7 +1130,7 @@ class WebsiteBuilderDatasetImport extends BackendModule
 											);
 										}
 										unset($zipReader);
-										@unlink(TL_ROOT . '/' . $strTarget . '/' . $strName);
+										unlink(TL_ROOT . '/' . $strTarget . '/' . $strName);
 									}
 								}
 
